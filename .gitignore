@@ -1,0 +1,7 @@
+*.o
+parser.c
+parser.h
+lexer.c
+lexer_gen.h
+test
+
