@@ -6,7 +6,17 @@
 
 int main(int argc, char **argv) {
 	char buf[1024*1024];
-	fread(buf, sizeof(buf), 1, stdin);
+	if (argc==1) {
+		fread(buf, sizeof(buf), 1, stdin);
+	} else {
+		FILE *f=fopen(argv[1], "r");
+		if (!f) {
+			perror(argv[1]);
+			exit(1);
+		}
+		fread(buf, sizeof(buf), 1, f);
+		fclose(f);
+	}
 
 	yyscan_t myscanner;
 	yylex_init(&myscanner);
@@ -17,6 +27,7 @@ int main(int argc, char **argv) {
 
 	yyparse(ibuf, myscanner);
 
+	insn_buf_fixup(ibuf);
 	insn_buf_dump(ibuf);
 
 //    yy_delete_buffer(YY_CURRENT_BUFFER, myscanner);

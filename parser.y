@@ -7,26 +7,19 @@
 %}
 
 %token TOKEN_EOL
-%token TOKEN_PLUS
-%token TOKEN_MINUS
-%token TOKEN_TIMES
-%token TOKEN_SLASH
-%token TOKEN_LPAREN
-%token TOKEN_RPAREN
+%token TOKEN_PLUS TOKEN_MINUS TOKEN_TIMES TOKEN_SLASH
+%token TOKEN_LPAREN TOKEN_RPAREN
 %token TOKEN_SEMICOLON
 %token TOKEN_COMMA
 %token TOKEN_PERIOD
 %token TOKEN_ASSIGN
-%token TOKEN_EQ
-%token TOKEN_NEQ
-%token TOKEN_LSS
-%token TOKEN_GTR
-%token TOKEN_LEQ
-%token TOKEN_GEQ
-%token TOKEN_NUMBERF
-%token TOKEN_NUMBERI
+%token TOKEN_EQ TOKEN_NEQ TOKEN_LSS TOKEN_GTR TOKEN_LEQ TOKEN_GEQ
+%token TOKEN_NUMBERF TOKEN_NUMBERI
 %token TOKEN_VAR
 %token TOKEN_STR
+%token TOKEN_CURLOPEN TOKEN_CURLCLOSE
+%token TOKEN_FOR TOKEN_WHILE
+%token TOKEN_FUNCTION
 
 %define api.pure full
 %parse-param {insn_buf_t *ibuf}
@@ -38,24 +31,75 @@
 input: %empty
 | input statement TOKEN_EOL
 | input statement TOKEN_SEMICOLON
+| input block
 
 
-statement: vardef
+block: block_open input block_close
+
+block_open: TOKEN_CURLOPEN {
+		insn_buf_start_block(ibuf);
+	}
+
+block_close: TOKEN_CURLCLOSE {
+		insn_buf_end_block(ibuf);
+	}
+
+
+statement: %empty
+| vardef
 | exp
 | assignment
+| funcdef
+//| while_statement
 
 
-assignment: TOKEN_STR TOKEN_ASSIGN exp {
-	int n=insn_buf_find_var(ibuf, $1.str);
-	if (n<0) {
-		yyerror(&yyloc, ibuf, scanner, "Undefined variable");
-		YYERROR;
+funcdef: TOKEN_FUNCTION funcname TOKEN_LPAREN funcargs TOKEN_RPAREN TOKEN_CURLOPEN input func_end
+
+funcname: TOKEN_STR {
+		insn_buf_start_block(ibuf);
+		insn_buf_name_block(ibuf, $$.str);
+		insn_buf_add_ins(ibuf, INSN_ENTER, 0);
 	}
-	insn_buf_add_ins(ibuf, INSN_WR_VAR, n);
+
+funcargs: %empty
+| funcarg
+| funcargs TOKEN_COMMA funcarg
+
+funcarg: TOKEN_STR {
+	insn_buf_add_arg(ibuf, $1.str);
 }
 
+func_end: TOKEN_CURLCLOSE {
+		insn_buf_add_return_if_needed(ibuf);
+		insn_buf_end_block(ibuf);
+	}
+
+
+
+//while_statement: TOKEN_WHILE TOKEN_LPAREN exp TOKEN_RPAREN input {
+//		int start_ip=insn_buf_get_cur_ip(ibuf);
+		
+//	}
+
+
+
+//while_block_end: %empty {
+//	insn_buf_add(ibuf, INSN_JMP
+//}
+
+assignment: TOKEN_STR TOKEN_ASSIGN exp {
+		if (!insn_buf_add_ins_with_var(ibuf, INSN_WR_VAR, $1.str)) {
+			yyerror(&yyloc, ibuf, scanner, "Undefined variable");
+			YYERROR;
+		}
+	}
+
 vardef: TOKEN_VAR TOKEN_STR {
-		insn_buf_add_var(ibuf, $2.str, 1);
+		bool r=insn_buf_add_var(ibuf, $2.str, 1);
+		if (!r) {
+			yyerror(&yyloc, ibuf, scanner, "Variable already defined");
+			YYERROR;
+		}
 		free($2.str);
 		$2.str=NULL;
 	}
@@ -64,16 +108,24 @@ vardef: TOKEN_VAR TOKEN_STR {
 exp: factor
 | exp TOKEN_PLUS factor { insn_buf_add_ins(ibuf, INSN_ADD, 0); }
 | exp TOKEN_MINUS factor { insn_buf_add_ins(ibuf, INSN_SUB, 0); }
-;
 
-factor: term
-| factor TOKEN_TIMES term { insn_buf_add_ins(ibuf, INSN_MUL, 0); }
-| factor TOKEN_SLASH term { insn_buf_add_ins(ibuf, INSN_DIV, 0); }
+
+factor: br_term
+| factor TOKEN_TIMES br_term { insn_buf_add_ins(ibuf, INSN_MUL, 0); }
+| factor TOKEN_SLASH br_term { insn_buf_add_ins(ibuf, INSN_DIV, 0); }
+
+br_term: term
+| TOKEN_LPAREN exp TOKEN_RPAREN
 
 term: TOKEN_NUMBERF { 
 		insn_buf_add_ins(ibuf, INSN_PUSH_I, (int)($$.numberf));
 		insn_buf_add_ins(ibuf, INSN_ADD_FR_I, (int)(fmod($$.numberf, 1)*65536.0));
 	}
 | TOKEN_NUMBERI { insn_buf_add_ins(ibuf, INSN_PUSH_I, $$.numberi); }
-
+| TOKEN_STR { 
+	if (!insn_buf_add_ins_with_var(ibuf, INSN_RD_VAR, $1.str)) {
+		yyerror(&yyloc, ibuf, scanner, "Undefined variable");
+		YYERROR;
+	}
+}
 

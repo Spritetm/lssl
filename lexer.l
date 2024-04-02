@@ -15,7 +15,8 @@
 %option reentrant bison-bridge
 %option bison-locations
 %option yylineno
-
+%option noinput
+%option nounput
 
 
 digit		[0-9]
@@ -40,10 +41,15 @@ hexdigit	[0-9A-Fa-f]
 ">"						{ return TOKEN_GTR;		}
 "<="					{ return TOKEN_LEQ;		}
 ">="					{ return TOKEN_GEQ;		}
+"{"						{ return TOKEN_CURLOPEN;	}
+"}"						{ return TOKEN_CURLCLOSE;	}
 {digit}+"."{digit}+		{ yylval->numberf=strtof(yytext, NULL); return TOKEN_NUMBERF; }
 "0x"{hexdigit}+			{ yylval->numberi=strtol(yytext, NULL, 16); return TOKEN_NUMBERI; }
 {digit}+			 	{ yylval->numberi=strtol(yytext, NULL, 10); return TOKEN_NUMBERI; }
 "var"				 	{ return TOKEN_VAR;		}
+"for"					{ return TOKEN_FOR;		}
+"while"					{ return TOKEN_WHILE;	}
+"function"				{ return TOKEN_FUNCTION;}
 [a-zA-Z0-9_]+			{ yylval->str=strdup(yytext); return TOKEN_STR; }
 
 " "
