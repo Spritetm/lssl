@@ -197,9 +197,11 @@ void insn_buf_add_ins(insn_buf_t *buf, int type, int val) {
 	insn->val=val;
 }
 
+//Function without 'return' returns 0 at the end implicitly.
 void insn_buf_add_return_if_needed(insn_buf_t *buf) {
 	if (buf->cur->insns_len>0 && buf->cur->insns[buf->cur->insns_len].type!=INSN_RETURN) {
 		insn_buf_add_ins(buf, INSN_PUSH_I, 0);
+		insn_buf_add_ins(buf, INSN_LEAVE, 0);
 		insn_buf_add_ins(buf, INSN_RETURN, 0);
 	}
 }
@@ -270,19 +272,22 @@ static int fix_vars_to_pos_on_stack(insn_block_t *blk, int base_pos) {
 static void func_fixup(insn_block_t *blk) {
 	//Fixup variables
 	int space=fix_vars_to_pos_on_stack(blk, 0);
-	//Fixup enter/return instructions
+	//count arguments
+	int args=0;
+	while (args<blk->vars_len && blk->vars[args].is_arg) args++;
+	//Fixup enter/leave/return instructions
 	for (int i=0; i<blk->insns_len; i++) {
-		if (blk->insns[i].type==INSN_ENTER) {
+		if (blk->insns[i].type==INSN_ENTER || blk->insns[i].type==INSN_LEAVE) {
 			if (space==0) {
 				blk->insns[i].type=INSN_NOP; //not needed; remove
 			} else {
 				blk->insns[i].val=space;
 			}
 		} else if (blk->insns[i].type==INSN_RETURN) {
-			blk->insns[i].val=space;
+			blk->insns[i].val=args;
 		}
 	}
-	//assign values to all instructions refering variables
+	//assign values to all instructions refering labels
 	
 	
 }
@@ -327,7 +332,8 @@ int insn_buf_fixup(insn_buf_t *buf) {
 #define ARG_INT 1
 #define ARG_FR 2
 #define ARG_VAR 3
-#define ARG_LABEL 3
+#define ARG_LABEL 4
+#define ARG_FUNCTION 5
 
 typedef struct {
 	const char *op;
@@ -352,8 +358,9 @@ static const op_t ops[]={
 	{"VAR", ARG_INT},
 	{"VARI", ARG_NONE},
 	{"ENTER", ARG_INT},
+	{"LEAVE", ARG_INT},
 	{"RETURN", ARG_INT},
-	{"CALL", ARG_LABEL},
+	{"CALL", ARG_FUNCTION},
 };
 
 static void dump_insn(int pos, insn_t *insn) {
@@ -371,6 +378,8 @@ static void dump_insn(int pos, insn_t *insn) {
 		printf("%s [%d] ; %s\n", ops[i].op, insn->var->offset, insn->var->name);
 	} else if (ops[i].argtype==ARG_LABEL) {
 		printf("%s %d\n", ops[i].op, insn->val);
+	} else if (ops[i].argtype==ARG_FUNCTION) {
+		printf("%s [%d] ; %s\n", ops[i].op, insn->val, insn->label);
 	}
 }
 

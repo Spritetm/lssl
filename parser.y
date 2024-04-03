@@ -47,7 +47,7 @@ block_close: TOKEN_CURLCLOSE {
 
 statement: %empty
 | vardef
-| exp
+| expr
 | assignment
 | funcdef
 //| while_statement
@@ -76,7 +76,7 @@ func_end: TOKEN_CURLCLOSE {
 
 
 
-//while_statement: TOKEN_WHILE TOKEN_LPAREN exp TOKEN_RPAREN input {
+//while_statement: TOKEN_WHILE TOKEN_LPAREN expr TOKEN_RPAREN input {
 //		int start_ip=insn_buf_get_cur_ip(ibuf);
 		
 //	}
@@ -87,7 +87,7 @@ func_end: TOKEN_CURLCLOSE {
 //	insn_buf_add(ibuf, INSN_JMP
 //}
 
-assignment: TOKEN_STR TOKEN_ASSIGN exp {
+assignment: TOKEN_STR TOKEN_ASSIGN expr {
 		if (!insn_buf_add_ins_with_var(ibuf, INSN_WR_VAR, $1.str)) {
 			yyerror(&yyloc, ibuf, scanner, "Undefined variable");
 			YYERROR;
@@ -105,9 +105,9 @@ vardef: TOKEN_VAR TOKEN_STR {
 	}
 
 
-exp: factor
-| exp TOKEN_PLUS factor { insn_buf_add_ins(ibuf, INSN_ADD, 0); }
-| exp TOKEN_MINUS factor { insn_buf_add_ins(ibuf, INSN_SUB, 0); }
+expr: factor
+| expr TOKEN_PLUS factor { insn_buf_add_ins(ibuf, INSN_ADD, 0); }
+| expr TOKEN_MINUS factor { insn_buf_add_ins(ibuf, INSN_SUB, 0); }
 
 
 factor: br_term
@@ -115,7 +115,7 @@ factor: br_term
 | factor TOKEN_SLASH br_term { insn_buf_add_ins(ibuf, INSN_DIV, 0); }
 
 br_term: term
-| TOKEN_LPAREN exp TOKEN_RPAREN
+| TOKEN_LPAREN expr TOKEN_RPAREN
 
 term: TOKEN_NUMBERF { 
 		insn_buf_add_ins(ibuf, INSN_PUSH_I, (int)($$.numberf));
@@ -123,9 +123,24 @@ term: TOKEN_NUMBERF {
 	}
 | TOKEN_NUMBERI { insn_buf_add_ins(ibuf, INSN_PUSH_I, $$.numberi); }
 | TOKEN_STR { 
-	if (!insn_buf_add_ins_with_var(ibuf, INSN_RD_VAR, $1.str)) {
-		yyerror(&yyloc, ibuf, scanner, "Undefined variable");
-		YYERROR;
+		if (!insn_buf_add_ins_with_var(ibuf, INSN_RD_VAR, $1.str)) {
+			yyerror(&yyloc, ibuf, scanner, "Undefined variable");
+			YYERROR;
+		}
 	}
-}
+| func_call
+
+
+func_call: TOKEN_STR TOKEN_LPAREN funcargs TOKEN_RPAREN {
+		insn_buf_add_ins_with_label(ibuf, INSN_CALL, $1.str);
+	}
+
+funcargs: %empty
+| expr
+| funcargs TOKEN_COMMA expr
+
+
+
+
+
 

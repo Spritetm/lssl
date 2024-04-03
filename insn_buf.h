@@ -37,6 +37,7 @@ enum ins_enum {
 	INSN_VAR,
 	INSN_VARI,
 	INSN_ENTER,
+	INSN_LEAVE,
 	INSN_RETURN,
 	INSN_CALL,
 };
