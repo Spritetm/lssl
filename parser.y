@@ -96,25 +96,25 @@ stdaloneexpr: expr {
 		insn_buf_end_src_pos(ibuf, @1.pos_start, @1.pos_end);
 	}
 
-funcdef: TOKEN_FUNCTION funcname TOKEN_LPAREN funcargs TOKEN_RPAREN TOKEN_CURLOPEN input func_end {
+funcdef: TOKEN_FUNCTION funcdefname TOKEN_LPAREN funcdefargs TOKEN_RPAREN TOKEN_CURLOPEN input funcdef_end {
 		insn_buf_end_src_pos(ibuf, @1.pos_start, @5.pos_end);
 	}
 
-funcname: TOKEN_STR {
+funcdefname: TOKEN_STR {
 		insn_buf_start_block(ibuf);
 		insn_buf_name_block(ibuf, $$.str);
 		insn_buf_add_ins(ibuf, INSN_ENTER, 0);
 	}
 
-funcargs: %empty
-| funcarg
-| funcargs TOKEN_COMMA funcarg
+funcdefargs: %empty
+| funcdefarg
+| funcdefargs TOKEN_COMMA funcdefarg
 
-funcarg: TOKEN_STR {
+funcdefarg: TOKEN_STR {
 		insn_buf_add_arg(ibuf, $1.str);
 	}
 
-func_end: TOKEN_CURLCLOSE {
+funcdef_end: TOKEN_CURLCLOSE {
 		insn_buf_add_return_if_needed(ibuf);
 		insn_buf_end_block(ibuf);
 	}
@@ -209,8 +209,8 @@ expr: compf
 | expr TOKEN_GEQ compf { insn_buf_add_ins(ibuf, INSN_TGEQ, 0); }
 
 compf: factor
-| expr TOKEN_PLUS factor { insn_buf_add_ins(ibuf, INSN_ADD, 0); }
-| expr TOKEN_MINUS factor { insn_buf_add_ins(ibuf, INSN_SUB, 0); }
+| compf TOKEN_PLUS factor { insn_buf_add_ins(ibuf, INSN_ADD, 0); }
+| compf TOKEN_MINUS factor { insn_buf_add_ins(ibuf, INSN_SUB, 0); }
 
 factor: br_term
 | factor TOKEN_TIMES br_term { insn_buf_add_ins(ibuf, INSN_MUL, 0); }
