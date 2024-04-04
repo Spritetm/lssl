@@ -7,6 +7,7 @@
 
 	//from https://stackoverflow.com/questions/656703/how-does-flex-support-bison-location-exactly
 	#define YY_USER_ACTION \
+		yylloc->pos_start = yylloc->pos_end; \
 		yylloc->first_line = yylloc->last_line; \
 		yylloc->first_column = yylloc->last_column; \
 		for(int i = 0; yytext[i] != '\0'; i++) { \
@@ -17,6 +18,7 @@
 			else { \
 				yylloc->last_column++; \
 			} \
+			yylloc->pos_end++; \
 		}
 
     void yyerror (const YYLTYPE *loc, insn_buf_t *ibuf, yyscan_t yyscanner, char const *msg) {

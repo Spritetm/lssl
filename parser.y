@@ -4,6 +4,29 @@
 #include "lexer.h"
 #include "lexer_gen.h"
 #include "insn_buf.h"
+
+# define YYLLOC_DEFAULT(Cur, Rhs, N)                      \
+do                                                        \
+  if (N)                                                  \
+    {                                                     \
+      (Cur).pos_start    = YYRHSLOC(Rhs, 1).pos_start;    \
+      (Cur).first_line   = YYRHSLOC(Rhs, 1).first_line;   \
+      (Cur).first_column = YYRHSLOC(Rhs, 1).first_column; \
+      (Cur).last_line    = YYRHSLOC(Rhs, N).last_line;    \
+      (Cur).last_column  = YYRHSLOC(Rhs, N).last_column;  \
+      (Cur).pos_end      = YYRHSLOC(Rhs, N).pos_end;      \
+    }                                                     \
+  else                                                    \
+    {                                                     \
+      (Cur).first_line   = (Cur).last_line   =            \
+        YYRHSLOC(Rhs, 0).last_line;                       \
+      (Cur).first_column = (Cur).last_column =            \
+        YYRHSLOC(Rhs, 0).last_column;                     \
+      (Cur).pos_start   = (Cur).pos_end      =            \
+        YYRHSLOC(Rhs, 0).pos_end;                         \
+    }                                                     \
+while (0)
+
 %}
 
 %token TOKEN_EOL
@@ -25,6 +48,7 @@
 %parse-param {insn_buf_t *ibuf}
 %param {yyscan_t scanner}
 %locations
+%define api.location.type {file_loc_t}
 
 %%
 
@@ -45,19 +69,32 @@ block_close: TOKEN_CURLCLOSE {
 		insn_buf_end_block(ibuf);
 	}
 
-statement: %empty
+statement: statement_start statement_w {
+		//we now do this per thing that can be a statement
+		//insn_buf_end_src_pos(ibuf, @1.pos_start, @2.pos_end);
+	}
+
+statement_start: %empty {
+	insn_buf_new_src_pos(ibuf);
+}
+
+statement_w: %empty
 | vardef
 | stdaloneexpr
 | assignment
 | funcdef
 | while_statement
 
-stdaloneexpr: expr {
-	//eval the expr but ignore the result
-	insn_buf_add_ins(ibuf, INSN_POP, 0);
-}
 
-funcdef: TOKEN_FUNCTION funcname TOKEN_LPAREN funcargs TOKEN_RPAREN TOKEN_CURLOPEN input func_end
+stdaloneexpr: expr {
+		//eval the expr but ignore the result
+		insn_buf_add_ins(ibuf, INSN_POP, 0);
+		insn_buf_end_src_pos(ibuf, @1.pos_start, @1.pos_end);
+	}
+
+funcdef: TOKEN_FUNCTION funcname TOKEN_LPAREN funcargs TOKEN_RPAREN TOKEN_CURLOPEN input func_end {
+		insn_buf_end_src_pos(ibuf, @1.pos_start, @5.pos_end);
+	}
 
 funcname: TOKEN_STR {
 		insn_buf_start_block(ibuf);
@@ -70,8 +107,8 @@ funcargs: %empty
 | funcargs TOKEN_COMMA funcarg
 
 funcarg: TOKEN_STR {
-	insn_buf_add_arg(ibuf, $1.str);
-}
+		insn_buf_add_arg(ibuf, $1.str);
+	}
 
 func_end: TOKEN_CURLCLOSE {
 		insn_buf_add_return_if_needed(ibuf);
@@ -83,6 +120,7 @@ while_statement: while_start TOKEN_LPAREN while_expr TOKEN_RPAREN input_line {
 		insn_t *while_start=insn_buf_pop_insn(ibuf);
 		insn_buf_add_ins_with_tgt(ibuf, INSN_JMP, while_start);
 		insn_buf_change_insn_tgt(ibuf, jnzi, insn_buf_next_insn(ibuf));
+		insn_buf_end_src_pos(ibuf, @1.pos_start, @4.pos_end);
 	}
 
 while_start: TOKEN_WHILE {
@@ -103,6 +141,7 @@ assignment: TOKEN_STR TOKEN_ASSIGN expr {
 			yyerror(&yyloc, ibuf, scanner, "Undefined variable");
 			YYERROR;
 		}
+		insn_buf_end_src_pos(ibuf, @1.pos_start, @3.pos_end);
 	}
 
 vardef: TOKEN_VAR TOKEN_STR {
@@ -113,6 +152,7 @@ vardef: TOKEN_VAR TOKEN_STR {
 		}
 		free($2.str);
 		$2.str=NULL;
+		insn_buf_end_src_pos(ibuf, @1.pos_start, @2.pos_end);
 	}
 | TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
 		bool r=insn_buf_add_var(ibuf, $2.str, 1);
@@ -123,6 +163,7 @@ vardef: TOKEN_VAR TOKEN_STR {
 		insn_buf_add_ins_with_var(ibuf, INSN_WR_VAR, $2.str);
 		free($2.str);
 		$2.str=NULL;
+		insn_buf_end_src_pos(ibuf, @1.pos_start, @4.pos_end);
 	}
 
 

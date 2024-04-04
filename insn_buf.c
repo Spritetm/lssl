@@ -52,6 +52,14 @@ struct variable_t {
 	variable_t *next;
 };
 
+typedef struct src_pos_t src_pos_t;
+
+struct src_pos_t {
+	int start;
+	int end;
+	src_pos_t *next;
+	src_pos_t *next_stack;
+};
 
 struct insn_t {
 	int type;
@@ -64,6 +72,8 @@ struct insn_t {
 	insn_block_t *block;
 	insn_t *next;
 	insn_t *next_in_block;
+
+	src_pos_t *src_pos;
 };
 
 typedef struct pushed_insn_t pushed_insn_t;
@@ -71,6 +81,7 @@ typedef struct pushed_insn_t pushed_insn_t;
 struct pushed_insn_t {
 	insn_t *insn;
 	pushed_insn_t *next;
+	pushed_insn_t *next_stack;
 };
 
 struct insn_block_t {
@@ -84,6 +95,8 @@ struct insn_block_t {
 	insn_block_t *sibling;
 	pushed_insn_t *insn_stack;
 };
+
+
 
 
 /*
@@ -101,6 +114,8 @@ struct insn_buf_t {
 	insn_t *first_insn;
 	insn_t *cur_insn;
 	insn_t *blank_insn; //if this is not NULL, use this insn rather than allocate a new one.
+	src_pos_t *src_pos;
+	src_pos_t *src_pos_stack;
 };
 
 //Note: if we were to properly free all this, we'd add these elements into one
@@ -143,6 +158,8 @@ static insn_t *new_insn(insn_buf_t *buf) {
 	buf->cur_insn=insn;
 	//set block to current
 	insn->block=buf->cur_blk;
+	//set source start and end pos
+	insn->src_pos=buf->src_pos_stack;
 	return insn;
 }
 
@@ -327,7 +344,7 @@ int insn_buf_fixup(insn_buf_t *buf) {
 	}
 
 	//Decide final position for each ins
-	int pc=1;
+	int pc=0;
 	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
 		i->pos=pc;
 		pc++; //todo: variable instruction length?
@@ -337,7 +354,6 @@ int insn_buf_fixup(insn_buf_t *buf) {
 	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
 		if (i->target) {
 			i->val=i->target->pos;
-			printf("fixup %d\n", i->target->pos);
 		}
 	}
 	return bp_offset;
@@ -401,7 +417,8 @@ void insn_buf_change_insn_tgt(insn_buf_t *buf, insn_t *insn, insn_t *tgt) {
 #define ARG_FR 2
 #define ARG_VAR 3
 #define ARG_LABEL 4
-#define ARG_FUNCTION 5
+#define ARG_TARGET 5
+#define ARG_FUNCTION 6
 
 typedef struct {
 	const char *op;
@@ -420,9 +437,9 @@ static const op_t ops[]={
 	{"DIV", ARG_NONE},
 	{"ADD", ARG_NONE},
 	{"SUB", ARG_NONE},
-	{"JMP", ARG_LABEL},
-	{"JNZ", ARG_LABEL},
-	{"JZ", ARG_LABEL},
+	{"JMP", ARG_TARGET},
+	{"JNZ", ARG_TARGET},
+	{"JZ", ARG_TARGET},
 	{"VAR", ARG_INT},
 	{"VARI", ARG_NONE},
 	{"ENTER", ARG_INT},
@@ -432,11 +449,11 @@ static const op_t ops[]={
 	{"POP", ARG_NONE},
 };
 
-static void dump_insn(int pos, insn_t *insn) {
+static void dump_insn(insn_t *insn) {
 	//keep in sync with enum in header
 	int i=insn->type;
 	if (i>sizeof(ops)/sizeof(op_t)) i=0; //ILL
-	printf("%04X\t", pos);
+	printf("%04X\t", insn->pos);
 	if (ops[i].argtype==ARG_NONE) {
 		printf("%s\n", ops[i].op);
 	} else if (ops[i].argtype==ARG_INT) {
@@ -447,15 +464,47 @@ static void dump_insn(int pos, insn_t *insn) {
 		printf("%s [%d] ; %s\n", ops[i].op, insn->var->offset, insn->var->name);
 	} else if (ops[i].argtype==ARG_LABEL) {
 		printf("%s %d\n", ops[i].op, insn->val);
+	} else if (ops[i].argtype==ARG_TARGET) {
+		printf("%s 0x%X\n", ops[i].op, insn->val);
 	} else if (ops[i].argtype==ARG_FUNCTION) {
 		printf("%s [%d] ; %s\n", ops[i].op, insn->val, insn->label);
 	}
 }
 
 
-void insn_buf_dump(insn_buf_t *buf) {
-	int pos=0;
+void insn_buf_dump(insn_buf_t *buf, const char *srctxt) {
+	char sbuf[256];
+	src_pos_t *spos=NULL;
 	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
-		dump_insn(pos++, i);
+		if (srctxt && i->src_pos != spos) {
+			//copy relevant source text to buffer and print
+			memset(sbuf, 0, sizeof(sbuf));
+			int l=i->src_pos->end - i->src_pos->start+1;
+			if (l>=sizeof(sbuf)-1) l=sizeof(sbuf)-1;
+			memcpy(sbuf, &srctxt[i->src_pos->start], l);
+			//eat up ending newlines
+			while (sbuf[strlen(sbuf)-1]=='\n') sbuf[strlen(sbuf)-1]=0;
+			printf(" ; %s\n", sbuf);
+			//ignore same srcpos for next insns
+			spos=i->src_pos;
+		}
+		dump_insn(i);
 	}
 }
+
+void insn_buf_end_src_pos(insn_buf_t *buf, int start, int end) {
+	buf->src_pos_stack->start=start;
+	buf->src_pos_stack->end=end;
+	//remove from stack
+	buf->src_pos_stack=buf->src_pos_stack->next_stack;
+}
+
+void insn_buf_new_src_pos(insn_buf_t *buf) {
+	src_pos_t *pos=calloc(sizeof(src_pos_t), 1);
+	//Add to ll & stack
+	pos->next=buf->src_pos;
+	pos->next_stack=buf->src_pos_stack;
+	buf->src_pos=pos;
+	buf->src_pos_stack=pos;
+}
+

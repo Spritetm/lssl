@@ -28,7 +28,7 @@ int main(int argc, char **argv) {
 	yyparse(ibuf, myscanner);
 
 	insn_buf_fixup(ibuf);
-	insn_buf_dump(ibuf);
+	insn_buf_dump(ibuf, buf);
 
 //    yy_delete_buffer(YY_CURRENT_BUFFER, myscanner);
     yylex_destroy(myscanner);
