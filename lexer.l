@@ -53,9 +53,9 @@ hexdigit	[0-9A-Fa-f]
 "."						{ return TOKEN_PERIOD;		}
 "="						{ return TOKEN_ASSIGN;		}
 "=="					{ return TOKEN_EQ;	}
-"<>"					{ return TOKEN_NEQ;		}
-"<"						{ return TOKEN_LSS;		}
-">"						{ return TOKEN_GTR;		}
+"!>"					{ return TOKEN_NEQ;		}
+"<"						{ return TOKEN_L;		}
+">"						{ return TOKEN_G;		}
 "<="					{ return TOKEN_LEQ;		}
 ">="					{ return TOKEN_GEQ;		}
 "{"						{ return TOKEN_CURLOPEN;	}
@@ -66,6 +66,7 @@ hexdigit	[0-9A-Fa-f]
 "var"				 	{ return TOKEN_VAR;		}
 "for"					{ return TOKEN_FOR;		}
 "while"					{ return TOKEN_WHILE;	}
+"if"					{ return TOKEN_IF;		}
 "function"				{ return TOKEN_FUNCTION;}
 [a-zA-Z0-9_]+			{ yylval->str=strdup(yytext); return TOKEN_STR; }
 

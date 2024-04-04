@@ -36,13 +36,13 @@ while (0)
 %token TOKEN_COMMA
 %token TOKEN_PERIOD
 %token TOKEN_ASSIGN
-%token TOKEN_EQ TOKEN_NEQ TOKEN_LSS TOKEN_GTR TOKEN_LEQ TOKEN_GEQ
 %token TOKEN_NUMBERF TOKEN_NUMBERI
 %token TOKEN_VAR
 %token TOKEN_STR
 %token TOKEN_CURLOPEN TOKEN_CURLCLOSE
-%token TOKEN_FOR TOKEN_WHILE
+%token TOKEN_FOR TOKEN_WHILE TOKEN_IF
 %token TOKEN_FUNCTION
+%token TOKEN_EQ TOKEN_NEQ TOKEN_L TOKEN_G TOKEN_LEQ TOKEN_GEQ
 
 %define api.pure full
 %parse-param {insn_buf_t *ibuf}
@@ -85,7 +85,9 @@ statement_w: %empty {
 | stdaloneexpr
 | assignment
 | funcdef
+| for_statement
 | while_statement
+| if_statement
 
 
 stdaloneexpr: expr {
@@ -131,10 +133,40 @@ while_start: TOKEN_WHILE {
 	}
 
 while_expr: expr {
+		//so we can fix this up later
 		insn_buf_push_cur_insn_pos(ibuf);
 		insn_buf_add_ins(ibuf, INSN_JNZ, 0);
-		//so we can fix this up later
-//		insn_buf_push_last_insn_pos(ibuf);
+	}
+
+if_statement: TOKEN_IF TOKEN_LPAREN if_expr TOKEN_RPAREN input_line {
+		insn_t *jnzi=insn_buf_pop_insn(ibuf);
+		insn_buf_change_insn_tgt(ibuf, jnzi, insn_buf_next_insn(ibuf));
+		insn_buf_end_src_pos(ibuf, @1.pos_start, @4.pos_end);
+	}
+
+if_expr: expr {
+		//add the JNZ and allow it to be targeted later
+		insn_buf_push_cur_insn_pos(ibuf);
+		insn_buf_add_ins(ibuf, INSN_JNZ, 0);
+	}
+
+for_statement: TOKEN_FOR TOKEN_LPAREN for_initial_statement TOKEN_SEMICOLON for_expr TOKEN_SEMICOLON statement TOKEN_RPAREN input_line {
+		insn_t *jnzi=insn_buf_pop_insn(ibuf);
+		insn_t *for_start=insn_buf_pop_insn(ibuf);
+		insn_buf_add_ins_with_tgt(ibuf, INSN_JMP, for_start);
+		insn_buf_change_insn_tgt(ibuf, jnzi, insn_buf_next_insn(ibuf));
+		insn_buf_end_src_pos(ibuf, @1.pos_start, @7.pos_end);
+	}
+
+for_initial_statement: statement {
+		//generated after the initial statement but before the condition
+		insn_buf_push_cur_insn_pos(ibuf); //save to return to later
+	}
+
+for_expr: expr {
+		//generated after condition
+		insn_buf_push_cur_insn_pos(ibuf); //for later fixup
+		insn_buf_add_ins(ibuf, INSN_JNZ, 0);
 	}
 
 
@@ -168,12 +200,17 @@ vardef: TOKEN_VAR TOKEN_STR {
 		insn_buf_end_src_pos(ibuf, @1.pos_start, @4.pos_end);
 	}
 
+expr: compf
+| expr TOKEN_EQ compf { insn_buf_add_ins(ibuf, INSN_TEQ, 0); }
+| expr TOKEN_NEQ compf { insn_buf_add_ins(ibuf, INSN_TNEQ, 0); }
+| expr TOKEN_L compf { insn_buf_add_ins(ibuf, INSN_TL, 0); }
+| expr TOKEN_G compf { insn_buf_add_ins(ibuf, INSN_TG, 0); }
+| expr TOKEN_LEQ compf { insn_buf_add_ins(ibuf, INSN_TLEQ, 0); }
+| expr TOKEN_GEQ compf { insn_buf_add_ins(ibuf, INSN_TGEQ, 0); }
 
-
-expr: factor
+compf: factor
 | expr TOKEN_PLUS factor { insn_buf_add_ins(ibuf, INSN_ADD, 0); }
 | expr TOKEN_MINUS factor { insn_buf_add_ins(ibuf, INSN_SUB, 0); }
-
 
 factor: br_term
 | factor TOKEN_TIMES br_term { insn_buf_add_ins(ibuf, INSN_MUL, 0); }

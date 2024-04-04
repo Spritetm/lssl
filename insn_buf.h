@@ -41,6 +41,12 @@ enum ins_enum {
 	INSN_RETURN,
 	INSN_CALL,
 	INSN_POP,
+	INSN_TEQ,
+	INSN_TNEQ,
+	INSN_TL,
+	INSN_TG,
+	INSN_TLEQ,
+	INSN_TGEQ,
 };
 
 typedef struct insn_buf_t insn_buf_t;

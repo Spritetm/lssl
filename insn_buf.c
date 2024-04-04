@@ -447,6 +447,12 @@ static const op_t ops[]={
 	{"RETURN", ARG_INT},
 	{"CALL", ARG_FUNCTION},
 	{"POP", ARG_NONE},
+	{"TEQ", ARG_NONE},
+	{"TNEQ", ARG_NONE},
+	{"TL", ARG_NONE},
+	{"TG", ARG_NONE},
+	{"TLEQ", ARG_NONE},
+	{"TGEQ", ARG_NONE},
 };
 
 static void dump_insn(insn_t *insn) {
