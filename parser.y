@@ -76,11 +76,14 @@ func_end: TOKEN_CURLCLOSE {
 
 
 
-//while_statement: TOKEN_WHILE TOKEN_LPAREN expr TOKEN_RPAREN input {
-//		int start_ip=insn_buf_get_cur_ip(ibuf);
+while_statement: while_start TOKEN_LPAREN expr TOKEN_RPAREN input {
+		int start_ip=insn_buf_get_cur_ip(ibuf);
 		
-//	}
+	}
 
+while_start: TOKEN_WHILE {
+		
+	}
 
 
 //while_block_end: %empty {

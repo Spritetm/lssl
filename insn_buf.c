@@ -38,150 +38,175 @@ var fixup:
 	- get total amount of vars so we can adjust the ENTER and RET instructions
 	- give each var a position, relative to BP
 	- go through all the blocks, convert var pointer into position
-
-
 */
 
+typedef struct variable_t variable_t;
+typedef struct insn_block_t insn_block_t;
 
-
-typedef struct {
+struct variable_t {
 	const char *name;
 	int size;
 	int offset;
 	int is_global;
 	int is_arg;
-} variable_t;
+	variable_t *next;
+};
 
-typedef struct insn_block_t insn_block_t;
 
-typedef struct {
+struct insn_t {
 	int type;
 	int val;
 	variable_t *var;
-	insn_block_t *block;
 	char *label;
-} insn_t;
+	insn_t *target;
 
+	insn_block_t *block;
+	insn_t *next;
+	insn_t *next_in_block;
+};
+
+typedef struct pushed_insn_t pushed_insn_t;
+
+struct pushed_insn_t {
+	insn_t *insn;
+	pushed_insn_t *next;
+};
 
 struct insn_block_t {
-	insn_t *insns;
-	char *name;
-	int insns_size;
-	int insns_len;
 	variable_t *vars;
-	int vars_size;
-	int vars_len;
+	char *name;		//name, if function
+	int params;		//parameter count, if function
+	int var_space;	//size of local vars
+
 	insn_block_t *parent;
-	int saved_addr[10];
+	insn_block_t *child;
+	insn_block_t *sibling;
+	pushed_insn_t *insn_stack;
 };
+
+
+/*
+Logic:
+A buffer has a LL of blocks and a list of instructions.
+* The instructions link together using their 'next' property to form
+  a list in program order.
+* Instructions also point to a block, so we can resolve variables properly.
+* Blocks link to their parent block, so we can resolve variables recursively.
+*/
 
 
 struct insn_buf_t {
-	insn_block_t *cur;
+	insn_block_t *cur_blk;
+	insn_t *first_insn;
+	insn_t *cur_insn;
+	insn_t *blank_insn; //if this is not NULL, use this insn rather than allocate a new one.
 };
 
-#define INC_SIZE 64
+//Note: if we were to properly free all this, we'd add these elements into one
+//huge linked list so we can free them from there.
 
-
-static insn_block_t *insn_block_create() {
+static insn_block_t *insn_block_create(insn_buf_t *buf) {
 	insn_block_t *ret=calloc(sizeof(insn_block_t), 1);
-	ret->insns_size=INC_SIZE;
-	ret->insns_len=0;
-	ret->insns=calloc(sizeof(insn_t), ret->insns_size);
-	ret->vars_size=INC_SIZE;
-	ret->vars_len=0;
-	ret->vars=calloc(sizeof(insn_t), ret->vars_size);
 	return ret;
+}
+
+
+static variable_t *variable_create() {
+	variable_t *var=calloc(sizeof(variable_t), 1);
+	return var;
 }
 
 insn_buf_t *insn_buf_create() {
 	insn_buf_t *ret=calloc(sizeof(insn_buf_t), 1);
-	//create default block
-	ret->cur=insn_block_create();
+	ret->cur_blk=insn_block_create(ret);
 	return ret;
 }
 
 //return new inst pos in given block
-//expand instruction array and fill with zeroes if needed
-static insn_t *new_insn(insn_block_t *blk) {
-	if(blk->insns_len==blk->insns_size) {
-		blk->insns_size+=INC_SIZE;
-		blk->insns=realloc(blk->insns, blk->insns_size*sizeof(insn_t));
+static insn_t *new_insn(insn_buf_t *buf) {
+	insn_t *insn;
+	if (buf->blank_insn) {
+		//pre-allocated insn? Use that.
+		insn=buf->blank_insn;
+		buf->blank_insn=NULL;
+	} else {
+		//Allocate insn.
+		insn=calloc(sizeof(insn_t), 1);
 	}
-	insn_t *ret=&blk->insns[blk->insns_len];
-	blk->insns_len++;
-	memset(ret, 0, sizeof(insn_t));
-	return ret;
+	//Link into ll.
+	if (buf->first_insn) {
+		buf->cur_insn->next=insn;
+	} else {
+		buf->first_insn=insn;
+	}
+	buf->cur_insn=insn;
+	//set block to current
+	insn->block=buf->cur_blk;
+	return insn;
 }
 
 void insn_buf_start_block(insn_buf_t *buf) {
-	printf("blk start\n");
-	insn_block_t *block=insn_block_create();
-	//insert pseudo-instruction to indicate sub-block
-	insn_t *blkinst=new_insn(buf->cur);
-	blkinst->block=block;
-	//swap current block
-	block->parent=buf->cur;
-	buf->cur=block;
+	insn_block_t *block=insn_block_create(buf);
+	block->sibling=buf->cur_blk->child;
+	buf->cur_blk->child=block;
+	block->parent=buf->cur_blk;
+	//make current
+	buf->cur_blk=block;
 }
 
 
 void insn_buf_end_block(insn_buf_t *buf) {
-	printf("blk end\n");
-	insn_block_t *old=buf->cur->parent;
-	buf->cur=old;
+	buf->cur_blk=buf->cur_blk->parent;
 }
 
 void insn_buf_name_block(insn_buf_t *buf, const char *name) {
-	buf->cur->name=strdup(name);
+	buf->cur_blk->name=strdup(name);
 }
 
-static variable_t *new_var(insn_block_t *blk, const char *name) {
+//add new var to given block
+static variable_t *new_var(insn_block_t *blk, const char *name, int size) {
 	//check already defined on this level
-	for (int i=0; i<blk->vars_len; i++) {
-		if (strcmp(name, blk->vars[i].name)==0) {
+	for (variable_t *v=blk->vars; v!=NULL; v=v->next) {
+		if (strcmp(name, v->name)==0) {
 			return NULL;
 		}
 	}
-	//expand array if needed
-	if (blk->vars_len==blk->vars_size) {
-		blk->vars_size+=INC_SIZE;
-		blk->vars=realloc(blk->vars, blk->vars_size*sizeof(variable_t));
-	}
-	variable_t *ret=&blk->vars[blk->vars_len];
-	blk->vars_len++;
-	memset(ret, 0, sizeof(variable_t));
+	//create and insert in ll
+	variable_t *ret=variable_create();
+	ret->next=blk->vars;
+	blk->vars=ret;
+	//set name and size
 	ret->name=strdup(name);
+	ret->size=size;
+	//if global, set flag
+	if (blk->parent==NULL) ret->is_global=1;
 	return ret;
 }
 
-
 bool insn_buf_add_arg(insn_buf_t *buf, const char *argname) {
-	//We use a trick here: as the arguments are added on an otherwise empty buffer,
-	//we can assume any variable is an argument that is added earlier.
-	int pos=buf->cur->vars_len;
-	variable_t *var=new_var(buf->cur, argname);
+	variable_t *var=new_var(buf->cur_blk, argname, 1);
 	if (!var) return false;
-	var->size=1;
+	//mark as arg
 	var->is_arg=1;
-	var->offset=-pos-2;
+	//args have a negative offset, depending on the amount of prev args
+	//but we need to know the total number of args, so we'll do fixup for this later
+	var->offset=buf->cur_blk->params;
+	buf->cur_blk->params++;
 	return true;
 }
 
 
-void insn_buf_change_ins(insn_buf_t *buf, int idx, int type, int val) {
-	assert(idx>=0 && idx<buf->cur->insns_len);
-	buf->cur->insns[idx].type=type;
-	buf->cur->insns[idx].val=val;
-	buf->cur->insns[idx].var=NULL;
+bool insn_buf_add_var(insn_buf_t *buf, const char *name, int size) {
+	variable_t *var=new_var(buf->cur_blk, name, size);
+	if (!var) return false;
+	return true;
 }
-
 
 static variable_t *insn_buf_find_var(insn_block_t *blk, const char *name) {
 	//See if the var is local
-	for (int i=0; i<blk->vars_len; i++) {
-		if (strcmp(name, blk->vars[i].name)==0) {
-			return &blk->vars[i];
+	for (variable_t *v=blk->vars; v!=NULL; v=v->next) {
+		if (strcmp(name, v->name)==0) {
+			return v;
 		}
 	}
 	if (blk->parent) {
@@ -192,14 +217,14 @@ static variable_t *insn_buf_find_var(insn_block_t *blk, const char *name) {
 }
 
 void insn_buf_add_ins(insn_buf_t *buf, int type, int val) {
-	insn_t *insn=new_insn(buf->cur);
+	insn_t *insn=new_insn(buf);
 	insn->type=type;
 	insn->val=val;
 }
 
 //Function without 'return' returns 0 at the end implicitly.
 void insn_buf_add_return_if_needed(insn_buf_t *buf) {
-	if (buf->cur->insns_len>0 && buf->cur->insns[buf->cur->insns_len].type!=INSN_RETURN) {
+	if (buf->cur_insn && buf->cur_insn->type!=INSN_RETURN) {
 		insn_buf_add_ins(buf, INSN_PUSH_I, 0);
 		insn_buf_add_ins(buf, INSN_LEAVE, 0);
 		insn_buf_add_ins(buf, INSN_RETURN, 0);
@@ -207,90 +232,56 @@ void insn_buf_add_return_if_needed(insn_buf_t *buf) {
 }
 
 bool insn_buf_add_ins_with_var(insn_buf_t *buf, int type, const char *varname) {
-	variable_t *v=insn_buf_find_var(buf->cur, varname);
+	variable_t *v=insn_buf_find_var(buf->cur_blk, varname);
 	if (!v) return false;
-	insn_t *insn=new_insn(buf->cur);
+	insn_t *insn=new_insn(buf);
 	insn->type=type;
-	insn->val=0;
 	insn->var=v;
 	return true;
 }
 
 void insn_buf_add_ins_with_label(insn_buf_t *buf, int type, const char *label) {
-	insn_t *insn=new_insn(buf->cur);
+	insn_t *insn=new_insn(buf);
 	insn->type=type;
 	insn->label=strdup(label);
 }
 
-int insn_buf_get_cur_ip(insn_buf_t *buf) {
-	return buf->cur->insns_len;
-}
-
-
-const char *insn_buf_var_get_name(insn_buf_t *buf, int idx) {
-	if (idx<0 || idx>=buf->cur->vars_len) return "ERROR";
-	return buf->cur->vars[idx].name;
-}
-
-
-bool insn_buf_add_var(insn_buf_t *buf, const char *name, int size) {
-	variable_t *var=new_var(buf->cur, name);
-	if (!var) return false;
-	var->size=size;
-	var->is_global=(buf->cur->parent==NULL);
-	return true;
-}
-
-void insn_buf_save_addr(insn_buf_t *buf, int idx, int addr) {
-	buf->cur->saved_addr[idx]=addr;
-}
-
-int insn_buf_get_saved_addr(insn_buf_t *buf, int idx) {
-	return buf->cur->saved_addr[idx];
-}
 
 //Does as the name says. Returns amount of stack space needed for all local
 //variables.
-static int fix_vars_to_pos_on_stack(insn_block_t *blk, int base_pos) {
+static int find_local_var_size(insn_block_t *blk, int base_pos) {
 	int space_base=0;
-	for (int i=0; i<blk->vars_len; i++) {
-		if (!blk->vars[i].is_arg) {
-			blk->vars[i].offset=base_pos+space_base;
-			space_base+=blk->vars[i].size;
+	if (blk->vars) {
+		for (variable_t *v=blk->vars; v!=NULL; v=v->next) {
+			if (!v->is_arg) {
+				v->offset=base_pos+space_base;
+				space_base+=v->size;
+			}
 		}
 	}
 	int max_space_block=0;
-	for (int i=0; i<blk->insns_len; i++) {
-		if (blk->insns[i].block) {
-			int n=fix_vars_to_pos_on_stack(blk->insns[i].block, base_pos+space_base);
-			if (max_space_block<n) max_space_block=n;
-		}
+	//Go through all child blocks, also recursively
+	//figure out the block space there; store the max needed.
+	for (insn_block_t *ch=blk->child; ch!=NULL; ch=ch->sibling) {
+		int n=find_local_var_size(ch, base_pos+space_base);
+		if (max_space_block<n) max_space_block=n;
 	}
 	return space_base+max_space_block;
 }
 
-static void func_fixup(insn_block_t *blk) {
-	//Fixup variables
-	int space=fix_vars_to_pos_on_stack(blk, 0);
-	//count arguments
-	int args=0;
-	while (args<blk->vars_len && blk->vars[args].is_arg) args++;
-	//Fixup enter/leave/return instructions
-	for (int i=0; i<blk->insns_len; i++) {
-		if (blk->insns[i].type==INSN_ENTER || blk->insns[i].type==INSN_LEAVE) {
-			if (space==0) {
-				blk->insns[i].type=INSN_NOP; //not needed; remove
-			} else {
-				blk->insns[i].val=space;
+//The args to functions are stored as positive integers, but the opcode needs
+//negative integers relative to the number of parameters. We convert that here.
+void correct_arg_pos(insn_block_t *blk) {
+	if (blk->vars) {
+		for (variable_t *v=blk->vars; v!=NULL; v=v->next) {
+			if (v->is_arg) {
+				assert(v->offset>=0); //should not be corrected yet
+				v->offset=-2-(blk->params-v->offset-1);
 			}
-		} else if (blk->insns[i].type==INSN_RETURN) {
-			blk->insns[i].val=args;
 		}
 	}
-	//assign values to all instructions refering labels
-	
-	
 }
+
 
 int insn_buf_fixup(insn_buf_t *buf) {
 	//Should be called on the top-level block.
@@ -301,32 +292,79 @@ int insn_buf_fixup(insn_buf_t *buf) {
 	//them (as in, give an initial value for BP)
 	//Returns value of BP.
 
-	insn_block_t *top=buf->cur;
+	insn_block_t *top=buf->cur_blk;
 	assert(top->parent == NULL);
 
 	//Collect and fixup global variables.
-	//note we can't use all the functions used in func_fixup as they will recurse
-	//into the sub-functions
 	int bp_offset=0;
-	for (int i=0; i<top->vars_len; i++) {
-		top->vars[i].is_global=1;
-		top->vars[i].offset=bp_offset;
-		bp_offset+=top->vars[i].size;
+	for (variable_t *v=top->vars; v!=NULL; v=v->next) {
+		assert(v->is_global);
+		v->offset=bp_offset;
+		bp_offset+=v->size;
+	}
+
+	for (insn_block_t *blk=top->child; blk!=NULL; blk=blk->sibling) {
+		//Fill in var_space members of function
+		blk->var_space=find_local_var_size(blk, 0);
+		//fixup args
+		correct_arg_pos(blk);
 	}
 
 
-	//Fixup all code blocks in the top level.
-	for (int i=0; i<top->insns_len; i++) {
-		//top block should have no normal opcodes
-		//note: should replace by a proper error
-		assert(top->insns[i].block && "no code allowed in top level blk");
-		func_fixup(top->insns[i].block);
-		//todo: make sure all functions end with a return.
+	//Fixup enter/leave/return instructions
+	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
+		if (i->type==INSN_ENTER || i->type==INSN_LEAVE) {
+			//can only appear on top-level functions
+			assert(i->block->parent!=NULL && i->block->parent->parent==NULL);
+			if (i->block->params==0) {
+				i->type=INSN_NOP; //not needed; remove
+			} else {
+				i->val=i->block->var_space;
+			}
+		} else if (i->type==INSN_RETURN) {
+			i->val=i->block->params;
+		}
 	}
+
 	return bp_offset;
 }
 
 
+static void push_insn(insn_block_t *blk, insn_t *insn) {
+	//create new insn ll entry and insert into stack
+	pushed_insn_t *p=calloc(sizeof(pushed_insn_t), 1);
+	p->insn=insn;
+	p->next=blk->insn_stack;
+	blk->insn_stack=p;
+}
+
+void insn_buf_push_last_insn_pos(insn_buf_t *buf) {
+	push_insn(buf->cur_blk, buf->cur_insn);
+}
+
+void insn_buf_push_cur_insn_pos(insn_buf_t *buf) {
+	//Pre-allocate next insn.
+	insn_t *insn=calloc(sizeof(insn_t), 1);
+	buf->blank_insn=insn;
+	//Push it
+	push_insn(buf->cur_blk, insn);
+}
+
+insn_t *insn_buf_pop_insn(insn_buf_t *buf) {
+	insn_block_t *blk=buf->cur_blk;
+	pushed_insn_t *p=blk->insn_stack;
+	assert(p);
+	insn_t *ret=p->insn;
+	blk->insn_stack=p->next;
+	free(p);
+	return ret;
+}
+
+void insn_buf_add_ins_with_tgt(insn_buf_t *buf, int type, insn_t *tgt) {
+	insn_t *insn=new_insn(buf);
+	insn->type=type;
+	insn->target=tgt;
+}
 
 #define ARG_NONE 0
 #define ARG_INT 1
@@ -383,20 +421,10 @@ static void dump_insn(int pos, insn_t *insn) {
 	}
 }
 
-int insn_block_dump(insn_block_t *blk, int start_pos) {
-	int pos=start_pos;
-	for (int i=0; i<blk->insns_len; i++) {
-		if (blk->insns[i].block) {
-			printf("; block start\n");
-			pos+=insn_block_dump(blk->insns[i].block, pos);
-			printf("; block end\n");
-		} else {
-			dump_insn(pos++, &blk->insns[i]);
-		}
-	}
-	return pos-start_pos;
-}
 
 void insn_buf_dump(insn_buf_t *buf) {
-	insn_block_dump(buf->cur, 0);
+	int pos=0;
+	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
+		dump_insn(pos++, i);
+	}
 }

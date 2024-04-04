@@ -43,6 +43,9 @@ enum ins_enum {
 };
 
 typedef struct insn_buf_t insn_buf_t;
+typedef struct insn_t insn_t;
+
+
 
 insn_buf_t *insn_buf_create();
 void insn_buf_start_block(insn_buf_t *buf);
@@ -53,8 +56,10 @@ void insn_buf_add_ins(insn_buf_t *buf, int type, int val);
 bool insn_buf_add_ins_with_var(insn_buf_t *buf, int type, const char *varname);
 void insn_buf_add_ins_with_label(insn_buf_t *buf, int type, const char *label);
 void insn_buf_add_return_if_needed(insn_buf_t *buf);
-void insn_buf_change_ins(insn_buf_t *buf, int idx, int type, int val);
 bool insn_buf_add_var(insn_buf_t *buf, const char *name, int size);
-int insn_buf_get_cur_ip(insn_buf_t *buf);
+int insn_buf_get_cur_insn_idx(insn_buf_t *buf);
 void insn_buf_dump(insn_buf_t *buf);
 int insn_buf_fixup(insn_buf_t *buf);
+
+void insn_buf_push_insn_idx(insn_buf_t *buf, int ip);
+int insn_buf_pop_insn_idx(insn_buf_t *buf);
