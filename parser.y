@@ -78,7 +78,9 @@ statement_start: %empty {
 	insn_buf_new_src_pos(ibuf);
 }
 
-statement_w: %empty
+statement_w: %empty {
+		insn_buf_end_src_pos(ibuf, 0, 0);
+	}
 | vardef
 | stdaloneexpr
 | assignment
