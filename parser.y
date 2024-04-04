@@ -200,7 +200,7 @@ func_call: TOKEN_STR TOKEN_LPAREN funccallargs TOKEN_RPAREN {
 
 funccallargs: %empty
 | expr
-| funcargs TOKEN_COMMA expr
+| funccallargs TOKEN_COMMA expr
 
 
 
