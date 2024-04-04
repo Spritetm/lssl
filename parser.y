@@ -29,10 +29,11 @@
 %%
 
 input: %empty
-| input statement TOKEN_EOL
-| input statement TOKEN_SEMICOLON
-| input block
+| input input_line
 
+input_line: statement TOKEN_EOL
+| statement TOKEN_SEMICOLON
+| block
 
 block: block_open input block_close
 
@@ -44,14 +45,17 @@ block_close: TOKEN_CURLCLOSE {
 		insn_buf_end_block(ibuf);
 	}
 
-
 statement: %empty
 | vardef
-| expr
+| stdaloneexpr
 | assignment
 | funcdef
-//| while_statement
+| while_statement
 
+stdaloneexpr: expr {
+	//eval the expr but ignore the result
+	insn_buf_add_ins(ibuf, INSN_POP, 0);
+}
 
 funcdef: TOKEN_FUNCTION funcname TOKEN_LPAREN funcargs TOKEN_RPAREN TOKEN_CURLOPEN input func_end
 
@@ -74,21 +78,25 @@ func_end: TOKEN_CURLCLOSE {
 		insn_buf_end_block(ibuf);
 	}
 
-
-
-while_statement: while_start TOKEN_LPAREN expr TOKEN_RPAREN input {
-		int start_ip=insn_buf_get_cur_ip(ibuf);
-		
+while_statement: while_start TOKEN_LPAREN while_expr TOKEN_RPAREN input_line {
+		insn_t *jnzi=insn_buf_pop_insn(ibuf);
+		insn_t *while_start=insn_buf_pop_insn(ibuf);
+		insn_buf_add_ins_with_tgt(ibuf, INSN_JMP, while_start);
+		insn_buf_change_insn_tgt(ibuf, jnzi, insn_buf_next_insn(ibuf));
 	}
 
 while_start: TOKEN_WHILE {
-		
+		//so we can jump to this in the end
+		insn_buf_push_cur_insn_pos(ibuf);
 	}
 
+while_expr: expr {
+		insn_buf_push_cur_insn_pos(ibuf);
+		insn_buf_add_ins(ibuf, INSN_JNZ, 0);
+		//so we can fix this up later
+//		insn_buf_push_last_insn_pos(ibuf);
+	}
 
-//while_block_end: %empty {
-//	insn_buf_add(ibuf, INSN_JMP
-//}
 
 assignment: TOKEN_STR TOKEN_ASSIGN expr {
 		if (!insn_buf_add_ins_with_var(ibuf, INSN_WR_VAR, $1.str)) {
@@ -106,6 +114,17 @@ vardef: TOKEN_VAR TOKEN_STR {
 		free($2.str);
 		$2.str=NULL;
 	}
+| TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
+		bool r=insn_buf_add_var(ibuf, $2.str, 1);
+		if (!r) {
+			yyerror(&yyloc, ibuf, scanner, "Variable already defined");
+			YYERROR;
+		}
+		insn_buf_add_ins_with_var(ibuf, INSN_WR_VAR, $2.str);
+		free($2.str);
+		$2.str=NULL;
+	}
+
 
 
 expr: factor
@@ -134,11 +153,11 @@ term: TOKEN_NUMBERF {
 | func_call
 
 
-func_call: TOKEN_STR TOKEN_LPAREN funcargs TOKEN_RPAREN {
+func_call: TOKEN_STR TOKEN_LPAREN funccallargs TOKEN_RPAREN {
 		insn_buf_add_ins_with_label(ibuf, INSN_CALL, $1.str);
 	}
 
-funcargs: %empty
+funccallargs: %empty
 | expr
 | funcargs TOKEN_COMMA expr
 

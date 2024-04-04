@@ -24,7 +24,8 @@ hexdigit	[0-9A-Fa-f]
 
 %%
 
-"\n"					{ return TOKEN_EOL;		}
+"//".*"\n"				{ return TOKEN_EOL;			}
+"\n"					{ return TOKEN_EOL;			}
 "+"						{ return TOKEN_PLUS;		}
 "-"						{ return TOKEN_MINUS;		}
 "*"						{ return TOKEN_TIMES;		}

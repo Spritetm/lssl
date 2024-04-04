@@ -40,6 +40,7 @@ enum ins_enum {
 	INSN_LEAVE,
 	INSN_RETURN,
 	INSN_CALL,
+	INSN_POP,
 };
 
 typedef struct insn_buf_t insn_buf_t;
@@ -57,9 +58,11 @@ bool insn_buf_add_ins_with_var(insn_buf_t *buf, int type, const char *varname);
 void insn_buf_add_ins_with_label(insn_buf_t *buf, int type, const char *label);
 void insn_buf_add_return_if_needed(insn_buf_t *buf);
 bool insn_buf_add_var(insn_buf_t *buf, const char *name, int size);
-int insn_buf_get_cur_insn_idx(insn_buf_t *buf);
 void insn_buf_dump(insn_buf_t *buf);
 int insn_buf_fixup(insn_buf_t *buf);
-
-void insn_buf_push_insn_idx(insn_buf_t *buf, int ip);
-int insn_buf_pop_insn_idx(insn_buf_t *buf);
+void insn_buf_push_last_insn_pos(insn_buf_t *buf);
+void insn_buf_push_cur_insn_pos(insn_buf_t *buf);
+insn_t *insn_buf_pop_insn(insn_buf_t *buf);
+void insn_buf_add_ins_with_tgt(insn_buf_t *buf, int type, insn_t *tgt);
+void insn_buf_change_insn_tgt(insn_buf_t *buf, insn_t *insn, insn_t *tgt);
+insn_t *insn_buf_next_insn(insn_buf_t *buf);

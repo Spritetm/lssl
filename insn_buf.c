@@ -59,6 +59,7 @@ struct insn_t {
 	variable_t *var;
 	char *label;
 	insn_t *target;
+	int pos;
 
 	insn_block_t *block;
 	insn_t *next;
@@ -310,7 +311,6 @@ int insn_buf_fixup(insn_buf_t *buf) {
 		correct_arg_pos(blk);
 	}
 
-
 	//Fixup enter/leave/return instructions
 	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
 		if (i->type==INSN_ENTER || i->type==INSN_LEAVE) {
@@ -326,6 +326,20 @@ int insn_buf_fixup(insn_buf_t *buf) {
 		}
 	}
 
+	//Decide final position for each ins
+	int pc=1;
+	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
+		i->pos=pc;
+		pc++; //todo: variable instruction length?
+	}
+
+	//Fixup targets for e.g. jump instructions
+	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
+		if (i->target) {
+			i->val=i->target->pos;
+			printf("fixup %d\n", i->target->pos);
+		}
+	}
 	return bp_offset;
 }
 
@@ -338,16 +352,27 @@ static void push_insn(insn_block_t *blk, insn_t *insn) {
 	blk->insn_stack=p;
 }
 
+//Note: this should point at the (nonexisting yet) *next* insn to be added.
+//If this is needed, we preliminarily allocate it and the new_insn function
+//returns this rather than allocate a new one.
+insn_t *insn_buf_next_insn(insn_buf_t *buf) {
+	insn_t *insn;
+	if (buf->blank_insn) {
+		//Hm, already did that. Use prev.
+		insn=buf->blank_insn;
+	} else {
+		insn=calloc(sizeof(insn_t), 1);
+		buf->blank_insn=insn;
+	}
+	return insn;
+}
+
 void insn_buf_push_last_insn_pos(insn_buf_t *buf) {
 	push_insn(buf->cur_blk, buf->cur_insn);
 }
 
 void insn_buf_push_cur_insn_pos(insn_buf_t *buf) {
-	//Pre-allocate next insn.
-	insn_t *insn=calloc(sizeof(insn_t), 1);
-	buf->blank_insn=insn;
-	//Push it
-	push_insn(buf->cur_blk, insn);
+	push_insn(buf->cur_blk, insn_buf_next_insn(buf));
 }
 
 insn_t *insn_buf_pop_insn(insn_buf_t *buf) {
@@ -365,6 +390,11 @@ void insn_buf_add_ins_with_tgt(insn_buf_t *buf, int type, insn_t *tgt) {
 	insn->type=type;
 	insn->target=tgt;
 }
+
+void insn_buf_change_insn_tgt(insn_buf_t *buf, insn_t *insn, insn_t *tgt) {
+	insn->target=tgt;
+}
+
 
 #define ARG_NONE 0
 #define ARG_INT 1
@@ -399,6 +429,7 @@ static const op_t ops[]={
 	{"LEAVE", ARG_INT},
 	{"RETURN", ARG_INT},
 	{"CALL", ARG_FUNCTION},
+	{"POP", ARG_NONE},
 };
 
 static void dump_insn(int pos, insn_t *insn) {
