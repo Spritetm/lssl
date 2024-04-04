@@ -5,6 +5,20 @@
 	#include "parser.h"
 	#include "insn_buf.h"
 
+	//from https://stackoverflow.com/questions/656703/how-does-flex-support-bison-location-exactly
+	#define YY_USER_ACTION \
+		yylloc->first_line = yylloc->last_line; \
+		yylloc->first_column = yylloc->last_column; \
+		for(int i = 0; yytext[i] != '\0'; i++) { \
+			if(yytext[i] == '\n') { \
+				yylloc->last_line++; \
+				yylloc->last_column = 0; \
+			} \
+			else { \
+				yylloc->last_column++; \
+			} \
+		}
+
     void yyerror (const YYLTYPE *loc, insn_buf_t *ibuf, yyscan_t yyscanner, char const *msg) {
 		printf("Error: %s on line %d col %d\n", msg, loc->first_line, loc->first_column);
 	}
