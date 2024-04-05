@@ -411,60 +411,15 @@ void insn_buf_change_insn_tgt(insn_buf_t *buf, insn_t *insn, insn_t *tgt) {
 	insn->target=tgt;
 }
 
-
-#define ARG_NONE 0
-#define ARG_INT 1
-#define ARG_FR 2
-#define ARG_VAR 3
-#define ARG_LABEL 4
-#define ARG_TARGET 5
-#define ARG_FUNCTION 6
-
-typedef struct {
-	const char *op;
-	int argtype;
-} op_t;
-
-static const op_t ops[]={
-	{"NOP", ARG_NONE},
-	{"PUSH_I", ARG_INT},
-	{"ADD_FR_I", ARG_FR},
-	{"RD_VAR", ARG_VAR},
-	{"WR_VAR", ARG_VAR},
-	{"RD_ARR", ARG_VAR},
-	{"WR_ARR", ARG_VAR},
-	{"MUL", ARG_NONE},
-	{"DIV", ARG_NONE},
-	{"ADD", ARG_NONE},
-	{"SUB", ARG_NONE},
-	{"JMP", ARG_TARGET},
-	{"JNZ", ARG_TARGET},
-	{"JZ", ARG_TARGET},
-	{"VAR", ARG_INT},
-	{"VARI", ARG_NONE},
-	{"ENTER", ARG_INT},
-	{"LEAVE", ARG_INT},
-	{"RETURN", ARG_INT},
-	{"CALL", ARG_FUNCTION},
-	{"POP", ARG_NONE},
-	{"TEQ", ARG_NONE},
-	{"TNEQ", ARG_NONE},
-	{"TL", ARG_NONE},
-	{"TG", ARG_NONE},
-	{"TLEQ", ARG_NONE},
-	{"TGEQ", ARG_NONE},
-};
-
 static void dump_insn(insn_t *insn) {
 	//keep in sync with enum in header
 	int i=insn->type;
-	if (i>sizeof(ops)/sizeof(op_t)) i=0; //ILL
 	printf("%04X\t", insn->pos);
 	if (lssl_vm_ops[i].argtype==ARG_NONE) {
 		printf("%s\n", lssl_vm_ops[i].op);
 	} else if (lssl_vm_ops[i].argtype==ARG_INT) {
 		printf("%s %d\n", lssl_vm_ops[i].op, insn->val);
-	} else if (lssl_vm_ops[i].argtype==ARG_FR) {
+	} else if (lssl_vm_ops[i].argtype==ARG_REAL) {
 		printf("%s %f\n", lssl_vm_ops[i].op, (insn->val/65536.0));
 	} else if (lssl_vm_ops[i].argtype==ARG_VAR) {
 		printf("%s [%d] ; %s\n", lssl_vm_ops[i].op, insn->var->offset, insn->var->name);
