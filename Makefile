@@ -10,9 +10,9 @@ parser.c parser.h: parser.y
 
 test.o: lexer_gen.h parser.h
 
-test: test.o lexer.o parser.o insn_buf.o
+test: test.o lexer.o parser.o insn_buf.o vm_defs.o
 	$(CC) $(CFLAGS) -o $@  $^ -lm
 
 clean:
-	rm -f test.o lexer.o parser.o insn_buf.o
+	rm -f test.o lexer.o parser.o insn_buf.o vm_defs.o
 	rm -f parser.c parser.h lexer.c lexer_gen.h

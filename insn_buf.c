@@ -460,20 +460,20 @@ static void dump_insn(insn_t *insn) {
 	int i=insn->type;
 	if (i>sizeof(ops)/sizeof(op_t)) i=0; //ILL
 	printf("%04X\t", insn->pos);
-	if (ops[i].argtype==ARG_NONE) {
-		printf("%s\n", ops[i].op);
-	} else if (ops[i].argtype==ARG_INT) {
-		printf("%s %d\n", ops[i].op, insn->val);
-	} else if (ops[i].argtype==ARG_FR) {
-		printf("%s %f\n", ops[i].op, (insn->val/65536.0));
-	} else if (ops[i].argtype==ARG_VAR) {
-		printf("%s [%d] ; %s\n", ops[i].op, insn->var->offset, insn->var->name);
-	} else if (ops[i].argtype==ARG_LABEL) {
-		printf("%s %d\n", ops[i].op, insn->val);
-	} else if (ops[i].argtype==ARG_TARGET) {
-		printf("%s 0x%X\n", ops[i].op, insn->val);
-	} else if (ops[i].argtype==ARG_FUNCTION) {
-		printf("%s [%d] ; %s\n", ops[i].op, insn->val, insn->label);
+	if (lssl_vm_ops[i].argtype==ARG_NONE) {
+		printf("%s\n", lssl_vm_ops[i].op);
+	} else if (lssl_vm_ops[i].argtype==ARG_INT) {
+		printf("%s %d\n", lssl_vm_ops[i].op, insn->val);
+	} else if (lssl_vm_ops[i].argtype==ARG_FR) {
+		printf("%s %f\n", lssl_vm_ops[i].op, (insn->val/65536.0));
+	} else if (lssl_vm_ops[i].argtype==ARG_VAR) {
+		printf("%s [%d] ; %s\n", lssl_vm_ops[i].op, insn->var->offset, insn->var->name);
+	} else if (lssl_vm_ops[i].argtype==ARG_LABEL) {
+		printf("%s %d\n", lssl_vm_ops[i].op, insn->val);
+	} else if (lssl_vm_ops[i].argtype==ARG_TARGET) {
+		printf("%s 0x%X\n", lssl_vm_ops[i].op, insn->val);
+	} else if (lssl_vm_ops[i].argtype==ARG_FUNCTION) {
+		printf("%s [%d] ; %s\n", lssl_vm_ops[i].op, insn->val, insn->label);
 	}
 }
 
