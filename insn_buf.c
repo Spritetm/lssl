@@ -329,6 +329,7 @@ int insn_buf_fixup(insn_buf_t *buf) {
 	}
 
 	//Fixup enter/leave/return instructions
+	//Also convert global variable load instructions.
 	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
 		if (i->type==INSN_ENTER || i->type==INSN_LEAVE) {
 			//can only appear on top-level functions
@@ -340,6 +341,10 @@ int insn_buf_fixup(insn_buf_t *buf) {
 			}
 		} else if (i->type==INSN_RETURN) {
 			i->val=i->block->params;
+		} else if (i->type==INSN_RD_VAR) {
+			if (i->var->is_global) i->type=INSN_RD_G_VAR;
+		} else if (i->type==INSN_WR_VAR) {
+			if (i->var->is_global) i->type=INSN_WR_G_VAR;
 		}
 	}
 
