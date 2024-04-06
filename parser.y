@@ -3,7 +3,8 @@
 #include <math.h>
 #include "lexer.h"
 #include "lexer_gen.h"
-#include "insn_buf.h"
+
+
 
 # define YYLLOC_DEFAULT(Cur, Rhs, N)                      \
 do                                                        \
@@ -29,6 +30,7 @@ while (0)
 
 %}
 
+
 %token TOKEN_EOL
 %token TOKEN_PLUS TOKEN_MINUS TOKEN_TIMES TOKEN_SLASH
 %token TOKEN_LPAREN TOKEN_RPAREN
@@ -45,41 +47,61 @@ while (0)
 %token TOKEN_EQ TOKEN_NEQ TOKEN_L TOKEN_G TOKEN_LEQ TOKEN_GEQ
 
 %define api.pure full
-%parse-param {insn_buf_t *ibuf}
+%parse-param {ast_node_t **program}
 %param {yyscan_t scanner}
 %locations
 %define api.location.type {file_loc_t}
 
+%union{
+	int numberi;
+	float numberf;
+	char *str;
+	ast_node_t *ast;
+}
+
+%type<numberi> TOKEN_NUMBERI
+%type<numberf> TOKEN_NUMBERF
+%type<str> TOKEN_STR
+%type<ast> input input_line statement block funcdef stdaloneexpr
+%type<ast> funcdefargs while_statement if_statement for_statement assignment
+%type<ast> vardef expr compf factor br_term term func_call funccallargs
+%type<ast> funcdefarg
+
 %%
 
-input: %empty
-| input input_line
+program: input {
+		*program=$1;
+	}
+
+input: %empty {
+		$$=NULL;
+	}
+| input input_line {
+		if ($2==NULL) {
+			//Statement was empty.
+			$$=$1;
+		} else if ($1!=NULL) {
+			//have earlier input, add as sibling
+			ast_add_sibling($1, $2);
+			$$=$1;
+		} else {
+			//earlier input is empty
+			$$=$2;
+		}
+	}
 
 input_line: statement TOKEN_EOL
 | statement TOKEN_SEMICOLON
 | block
 
-block: block_open input block_close
-
-block_open: TOKEN_CURLOPEN {
-		insn_buf_start_block(ibuf);
+block: TOKEN_CURLOPEN input TOKEN_CURLCLOSE {
+		$$=ast_new_node(AST_TYPE_BLOCK);
+		$$->children=$2;
+		$2->parent=$$;
 	}
 
-block_close: TOKEN_CURLCLOSE {
-		insn_buf_end_block(ibuf);
-	}
-
-statement: statement_start statement_w {
-		//we now do this per thing that can be a statement
-		//insn_buf_end_src_pos(ibuf, @1.pos_start, @2.pos_end);
-	}
-
-statement_start: %empty {
-	insn_buf_new_src_pos(ibuf);
-}
-
-statement_w: %empty {
-		insn_buf_end_src_pos(ibuf, 0, 0);
+statement: %empty {
+		$$=NULL;
 	}
 | vardef
 | stdaloneexpr
@@ -92,154 +114,117 @@ statement_w: %empty {
 
 stdaloneexpr: expr {
 		//eval the expr but ignore the result
-		insn_buf_add_ins(ibuf, INSN_POP, 0);
-		insn_buf_end_src_pos(ibuf, @1.pos_start, @1.pos_end);
+		$$=ast_new_node(AST_TYPE_DROP);
+		$$->children=$1;
 	}
 
-funcdef: TOKEN_FUNCTION funcdefname TOKEN_LPAREN funcdefargs TOKEN_RPAREN TOKEN_CURLOPEN input funcdef_end {
-		insn_buf_end_src_pos(ibuf, @1.pos_start, @5.pos_end);
-	}
-
-funcdefname: TOKEN_STR {
-		insn_buf_start_block(ibuf);
-		insn_buf_name_block(ibuf, $$.str);
-		insn_buf_add_ins(ibuf, INSN_ENTER, 0);
+funcdef: TOKEN_FUNCTION TOKEN_STR TOKEN_LPAREN funcdefargs TOKEN_RPAREN TOKEN_CURLOPEN input TOKEN_CURLCLOSE {
+		$$=ast_new_node(AST_TYPE_FUNCDEF);
+		$$->name=strdup($2);
+		ast_add_child($$, $4);
+		ast_add_child($$, $7);
 	}
 
 funcdefargs: %empty
 | funcdefarg
-| funcdefargs TOKEN_COMMA funcdefarg
+| funcdefargs TOKEN_COMMA funcdefarg {
+	ast_add_sibling($1, $3);
+	$$=$1;
+}
 
 funcdefarg: TOKEN_STR {
-		insn_buf_add_arg(ibuf, $1.str);
+		$$=ast_new_node(AST_TYPE_FUNCDEFARG);
+		$$->name=strdup($1);
 	}
 
-funcdef_end: TOKEN_CURLCLOSE {
-		insn_buf_add_return_if_needed(ibuf);
-		insn_buf_end_block(ibuf);
+while_statement: TOKEN_WHILE TOKEN_LPAREN expr TOKEN_RPAREN input_line {
+		$$=ast_new_node(AST_TYPE_WHILE);
+		ast_add_child($$, $3);
+		ast_add_child($$, $5);
 	}
 
-while_statement: while_start TOKEN_LPAREN while_expr TOKEN_RPAREN input_line {
-		insn_t *jnzi=insn_buf_pop_insn(ibuf);
-		insn_t *while_start=insn_buf_pop_insn(ibuf);
-		insn_buf_add_ins_with_tgt(ibuf, INSN_JMP, while_start);
-		insn_buf_change_insn_tgt(ibuf, jnzi, insn_buf_next_insn(ibuf));
-		insn_buf_end_src_pos(ibuf, @1.pos_start, @4.pos_end);
+if_statement: TOKEN_IF TOKEN_LPAREN expr TOKEN_RPAREN input_line {
+		$$=ast_new_node(AST_TYPE_IF);
+		ast_add_child($$, $3);
+		ast_add_child($$, $5);
 	}
 
-while_start: TOKEN_WHILE {
-		//so we can jump to this in the end
-		insn_buf_push_cur_insn_pos(ibuf);
+for_statement: TOKEN_FOR TOKEN_LPAREN statement TOKEN_SEMICOLON expr TOKEN_SEMICOLON statement TOKEN_RPAREN input_line {
+		$$=ast_new_node(AST_TYPE_FOR);
+		ast_add_child($$, $3);
+		ast_add_child($$, $5);
+		ast_add_child($$, $7);
+		ast_add_child($$, $9);
 	}
-
-while_expr: expr {
-		//so we can fix this up later
-		insn_buf_push_cur_insn_pos(ibuf);
-		insn_buf_add_ins(ibuf, INSN_JNZ, 0);
-	}
-
-if_statement: TOKEN_IF TOKEN_LPAREN if_expr TOKEN_RPAREN input_line {
-		insn_t *jnzi=insn_buf_pop_insn(ibuf);
-		insn_buf_change_insn_tgt(ibuf, jnzi, insn_buf_next_insn(ibuf));
-		insn_buf_end_src_pos(ibuf, @1.pos_start, @4.pos_end);
-	}
-
-if_expr: expr {
-		//add the JNZ and allow it to be targeted later
-		insn_buf_push_cur_insn_pos(ibuf);
-		insn_buf_add_ins(ibuf, INSN_JNZ, 0);
-	}
-
-for_statement: TOKEN_FOR TOKEN_LPAREN for_initial_statement TOKEN_SEMICOLON for_expr TOKEN_SEMICOLON statement TOKEN_RPAREN input_line {
-		insn_t *jnzi=insn_buf_pop_insn(ibuf);
-		insn_t *for_start=insn_buf_pop_insn(ibuf);
-		insn_buf_add_ins_with_tgt(ibuf, INSN_JMP, for_start);
-		insn_buf_change_insn_tgt(ibuf, jnzi, insn_buf_next_insn(ibuf));
-		insn_buf_end_src_pos(ibuf, @1.pos_start, @7.pos_end);
-	}
-
-for_initial_statement: statement {
-		//generated after the initial statement but before the condition
-		insn_buf_push_cur_insn_pos(ibuf); //save to return to later
-	}
-
-for_expr: expr {
-		//generated after condition
-		insn_buf_push_cur_insn_pos(ibuf); //for later fixup
-		insn_buf_add_ins(ibuf, INSN_JNZ, 0);
-	}
-
 
 assignment: TOKEN_STR TOKEN_ASSIGN expr {
-		if (!insn_buf_add_ins_with_var(ibuf, INSN_WR_VAR, $1.str)) {
-			yyerror(&yyloc, ibuf, scanner, "Undefined variable");
-			YYERROR;
-		}
-		insn_buf_end_src_pos(ibuf, @1.pos_start, @3.pos_end);
+		$$=ast_new_node(AST_TYPE_ASSIGN);
+		$$->name=strdup($1);
+		ast_add_child($$, $3);
 	}
 
 vardef: TOKEN_VAR TOKEN_STR {
-		bool r=insn_buf_add_var(ibuf, $2.str, 1);
-		if (!r) {
-			yyerror(&yyloc, ibuf, scanner, "Variable already defined");
-			YYERROR;
-		}
-		free($2.str);
-		$2.str=NULL;
-		insn_buf_end_src_pos(ibuf, @1.pos_start, @2.pos_end);
+		$$=ast_new_node(AST_TYPE_DECLARE);
+		$$->name=strdup($2);
 	}
 | TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
-		bool r=insn_buf_add_var(ibuf, $2.str, 1);
-		if (!r) {
-			yyerror(&yyloc, ibuf, scanner, "Variable already defined");
-			YYERROR;
-		}
-		insn_buf_add_ins_with_var(ibuf, INSN_WR_VAR, $2.str);
-		free($2.str);
-		$2.str=NULL;
-		insn_buf_end_src_pos(ibuf, @1.pos_start, @4.pos_end);
+		$$=ast_new_node(AST_TYPE_DECLARE);
+		$$->name=strdup($2);
+
+		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN);
+		a->name=strdup($2);
+		ast_add_sibling($$, a);
+		ast_add_child(a, $4);
 	}
 
 expr: compf
-| expr TOKEN_EQ compf { insn_buf_add_ins(ibuf, INSN_TEQ, 0); }
-| expr TOKEN_NEQ compf { insn_buf_add_ins(ibuf, INSN_TNEQ, 0); }
-| expr TOKEN_L compf { insn_buf_add_ins(ibuf, INSN_TL, 0); }
-| expr TOKEN_G compf { insn_buf_add_ins(ibuf, INSN_TG, 0); }
-| expr TOKEN_LEQ compf { insn_buf_add_ins(ibuf, INSN_TLEQ, 0); }
-| expr TOKEN_GEQ compf { insn_buf_add_ins(ibuf, INSN_TGEQ, 0); }
+| expr TOKEN_EQ compf {   $$=ast_new_node_2chld(AST_TYPE_TEQ, $1, $3); }
+| expr TOKEN_NEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TNEQ, $1, $3); }
+| expr TOKEN_L compf {    $$=ast_new_node_2chld(AST_TYPE_TL, $1, $3); }
+| expr TOKEN_G compf {    $$=ast_new_node_2chld(AST_TYPE_TL, $3, $1); }
+| expr TOKEN_LEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TLEQ, $1, $3); }
+| expr TOKEN_GEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TLEQ, $3, $1); }
 
 compf: factor
-| compf TOKEN_PLUS factor { insn_buf_add_ins(ibuf, INSN_ADD, 0); }
-| compf TOKEN_MINUS factor { insn_buf_add_ins(ibuf, INSN_SUB, 0); }
+| compf TOKEN_PLUS factor {  $$=ast_new_node_2chld(AST_TYPE_PLUS, $1, $3); }
+| compf TOKEN_MINUS factor { $$=ast_new_node_2chld(AST_TYPE_MINUS, $1, $3); }
 
 factor: br_term
-| factor TOKEN_TIMES br_term { insn_buf_add_ins(ibuf, INSN_MUL, 0); }
-| factor TOKEN_SLASH br_term { insn_buf_add_ins(ibuf, INSN_DIV, 0); }
+| factor TOKEN_TIMES br_term { $$=ast_new_node_2chld(AST_TYPE_TIMES, $1, $3); }
+| factor TOKEN_SLASH br_term { $$=ast_new_node_2chld(AST_TYPE_DIVIDE, $1, $3); }
 
 br_term: term
-| TOKEN_LPAREN expr TOKEN_RPAREN
-
-term: TOKEN_NUMBERF { 
-		insn_buf_add_ins(ibuf, INSN_PUSH_I, (int)($$.numberf));
-		insn_buf_add_ins(ibuf, INSN_ADD_FR_I, (int)(fmod($$.numberf, 1)*65536.0));
+| TOKEN_LPAREN expr TOKEN_RPAREN {
+		$$=$2;
 	}
-| TOKEN_NUMBERI { insn_buf_add_ins(ibuf, INSN_PUSH_I, $$.numberi); }
+
+term: TOKEN_NUMBERI { 
+		$$=ast_new_node(AST_TYPE_INT);
+		$$->numberi=$1;
+	 }
+| TOKEN_NUMBERF { 
+		$$=ast_new_node(AST_TYPE_FLOAT);
+		$$->numberf=$1;
+	}
 | TOKEN_STR { 
-		if (!insn_buf_add_ins_with_var(ibuf, INSN_RD_VAR, $1.str)) {
-			yyerror(&yyloc, ibuf, scanner, "Undefined variable");
-			YYERROR;
-		}
+		$$=ast_new_node(AST_TYPE_VAR);
+		$$->name=strdup($1);
 	}
 | func_call
 
 
 func_call: TOKEN_STR TOKEN_LPAREN funccallargs TOKEN_RPAREN {
-		insn_buf_add_ins_with_label(ibuf, INSN_CALL, $1.str);
+		$$=ast_new_node(AST_TYPE_FUNCCALL);
+		$$->name=strdup($1);
+		ast_add_child($$, $3);
 	}
 
 funccallargs: %empty
 | expr
-| funccallargs TOKEN_COMMA expr
+| funccallargs TOKEN_COMMA expr {
+	ast_add_sibling($1, $3);
+	$$=$1;
+}
 
 
 

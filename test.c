@@ -23,12 +23,14 @@ int main(int argc, char **argv) {
 //    struct yyguts_t * yyg = (struct yyguts_t*)myscanner;
     yy_scan_string(buf, myscanner);
 
-	insn_buf_t *ibuf=insn_buf_create();
+	ast_node_t *prognode;
 
-	yyparse(ibuf, myscanner);
+	yyparse(&prognode, myscanner);
 
-	insn_buf_fixup(ibuf);
-	insn_buf_dump(ibuf, buf);
+	ast_dump(prognode);
+
+//	insn_buf_fixup(ibuf);
+//	insn_buf_dump(ibuf, buf);
 
 //    yy_delete_buffer(YY_CURRENT_BUFFER, myscanner);
     yylex_destroy(myscanner);

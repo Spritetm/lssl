@@ -1,7 +1,9 @@
 #pragma once
 #include "insn_buf.h"
+#include "ast.h"
 
-#define YYSTYPE token_t
+
+//#define YYSTYPE ast_node_t*
 
 typedef struct {
 	int numberi;
@@ -24,7 +26,7 @@ typedef struct {
 
 #include "parser.h"
 
-void yyerror (const YYLTYPE *loc, insn_buf_t *ibuf, yyscan_t yyscanner, char const *msg);
+void yyerror (const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, char const *msg);
 
 
 

@@ -21,11 +21,13 @@
 			yylloc->pos_end++; \
 		}
 
-    void yyerror (const YYLTYPE *loc, insn_buf_t *ibuf, yyscan_t yyscanner, char const *msg) {
+    void yyerror (const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, char const *msg) {
 		printf("Error: %s on line %d col %d\n", msg, loc->first_line, loc->first_column);
 	}
 
 %}
+
+
 
 %option warn nodefault
 %option reentrant bison-bridge
@@ -34,11 +36,12 @@
 %option noinput
 %option nounput
 
-
 digit		[0-9]
 hexdigit	[0-9A-Fa-f]
 
 %%
+
+
 
 "//".*"\n"				{ return TOKEN_EOL;			}
 "\n"					{ return TOKEN_EOL;			}
@@ -60,15 +63,15 @@ hexdigit	[0-9A-Fa-f]
 ">="					{ return TOKEN_GEQ;		}
 "{"						{ return TOKEN_CURLOPEN;	}
 "}"						{ return TOKEN_CURLCLOSE;	}
-{digit}+"."{digit}+		{ yylval->numberf=strtof(yytext, NULL); return TOKEN_NUMBERF; }
-"0x"{hexdigit}+			{ yylval->numberi=strtol(yytext, NULL, 16); return TOKEN_NUMBERI; }
-{digit}+			 	{ yylval->numberi=strtol(yytext, NULL, 10); return TOKEN_NUMBERI; }
+{digit}+"."{digit}+		{ (yylval)->numberf=strtof(yytext, NULL); return TOKEN_NUMBERF; }
+"0x"{hexdigit}+			{ (yylval)->numberi=strtol(yytext, NULL, 16); return TOKEN_NUMBERI; }
+{digit}+			 	{ (yylval)->numberi=strtol(yytext, NULL, 10); return TOKEN_NUMBERI; }
 "var"				 	{ return TOKEN_VAR;		}
 "for"					{ return TOKEN_FOR;		}
 "while"					{ return TOKEN_WHILE;	}
 "if"					{ return TOKEN_IF;		}
 "function"				{ return TOKEN_FUNCTION;}
-[a-zA-Z0-9_]+			{ yylval->str=strdup(yytext); return TOKEN_STR; }
+[a-zA-Z0-9_]+			{ (yylval)->str=strdup(yytext); return TOKEN_STR; }
 
 " "
 \t

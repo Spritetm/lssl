@@ -40,16 +40,21 @@ var fixup:
 	- go through all the blocks, convert var pointer into position
 */
 
-typedef struct variable_t variable_t;
+typedef struct symbol_t symbol_t;
 typedef struct insn_block_t insn_block_t;
 
-struct variable_t {
+#define SYM_TYPE_LOCAL 0
+#define SYM_TYPE_GLOBAL 1
+#define SYM_TYPE_ARG 3
+#define SYM_TYPE_FUNCTION 4
+
+struct symbol_t {
 	const char *name;
 	int size;
 	int offset;
-	int is_global;
-	int is_arg;
-	variable_t *next;
+	int type;
+	insn_t *target; //in case of function
+	symbol_t *next;
 };
 
 typedef struct src_pos_t src_pos_t;
@@ -64,8 +69,7 @@ struct src_pos_t {
 struct insn_t {
 	int type;
 	int val;
-	variable_t *var;
-	char *label;
+	symbol_t *sym;
 	insn_t *target;
 	int pos;
 
@@ -85,7 +89,7 @@ struct pushed_insn_t {
 };
 
 struct insn_block_t {
-	variable_t *vars;
+	symbol_t *syms;
 	char *name;		//name, if function
 	int params;		//parameter count, if function
 	int var_space;	//size of local vars
@@ -127,9 +131,9 @@ static insn_block_t *insn_block_create(insn_buf_t *buf) {
 }
 
 
-static variable_t *variable_create() {
-	variable_t *var=calloc(sizeof(variable_t), 1);
-	return var;
+static symbol_t *symbol_create() {
+	symbol_t *sym=calloc(sizeof(symbol_t), 1);
+	return sym;
 }
 
 insn_buf_t *insn_buf_create() {
@@ -177,35 +181,33 @@ void insn_buf_end_block(insn_buf_t *buf) {
 	buf->cur_blk=buf->cur_blk->parent;
 }
 
-void insn_buf_name_block(insn_buf_t *buf, const char *name) {
-	buf->cur_blk->name=strdup(name);
-}
 
 //add new var to given block
-static variable_t *new_var(insn_block_t *blk, const char *name, int size) {
+static symbol_t *new_var(insn_block_t *blk, const char *name, int size) {
 	//check already defined on this level
-	for (variable_t *v=blk->vars; v!=NULL; v=v->next) {
+	for (symbol_t *v=blk->syms; v!=NULL; v=v->next) {
 		if (strcmp(name, v->name)==0) {
 			return NULL;
 		}
 	}
 	//create and insert in ll
-	variable_t *ret=variable_create();
-	ret->next=blk->vars;
-	blk->vars=ret;
+	symbol_t *ret=symbol_create();
+	ret->next=blk->syms;
+	blk->syms=ret;
 	//set name and size
 	ret->name=strdup(name);
 	ret->size=size;
+	ret->type=SYM_TYPE_LOCAL;
 	//if global, set flag
-	if (blk->parent==NULL) ret->is_global=1;
+	if (blk->parent==NULL) ret->type=SYM_TYPE_GLOBAL;
 	return ret;
 }
 
 bool insn_buf_add_arg(insn_buf_t *buf, const char *argname) {
-	variable_t *var=new_var(buf->cur_blk, argname, 1);
+	symbol_t *var=new_var(buf->cur_blk, argname, 1);
 	if (!var) return false;
 	//mark as arg
-	var->is_arg=1;
+	var->type=SYM_TYPE_ARG;
 	//args have a negative offset, depending on the amount of prev args
 	//but we need to know the total number of args, so we'll do fixup for this later
 	var->offset=buf->cur_blk->params;
@@ -215,14 +217,14 @@ bool insn_buf_add_arg(insn_buf_t *buf, const char *argname) {
 
 
 bool insn_buf_add_var(insn_buf_t *buf, const char *name, int size) {
-	variable_t *var=new_var(buf->cur_blk, name, size);
+	symbol_t *var=new_var(buf->cur_blk, name, size);
 	if (!var) return false;
 	return true;
 }
 
-static variable_t *insn_buf_find_var(insn_block_t *blk, const char *name) {
+static symbol_t *insn_buf_find_var(insn_block_t *blk, const char *name) {
 	//See if the var is local
-	for (variable_t *v=blk->vars; v!=NULL; v=v->next) {
+	for (symbol_t *v=blk->syms; v!=NULL; v=v->next) {
 		if (strcmp(name, v->name)==0) {
 			return v;
 		}
@@ -249,29 +251,55 @@ void insn_buf_add_return_if_needed(insn_buf_t *buf) {
 	}
 }
 
-bool insn_buf_add_ins_with_var(insn_buf_t *buf, int type, const char *varname) {
-	variable_t *v=insn_buf_find_var(buf->cur_blk, varname);
-	if (!v) return false;
-	insn_t *insn=new_insn(buf);
-	insn->type=type;
-	insn->var=v;
-	return true;
+symbol_t *new_function_sym(insn_buf_t *buf, const char *name) {
+	symbol_t *v=symbol_create();
+	v->type=SYM_TYPE_FUNCTION;
+	v->name=strdup(name);
+	//find top-level block
+	insn_block_t *blk=buf->cur_blk;
+	while (blk->parent!=NULL) blk=blk->parent;
+	//add symbol
+	v->next=blk->syms;
+	blk->syms=v;
+	return v;
 }
 
-void insn_buf_add_ins_with_label(insn_buf_t *buf, int type, const char *label) {
+void insn_buf_add_ins_with_sym(insn_buf_t *buf, int type, const char *symname) {
+	symbol_t *v=insn_buf_find_var(buf->cur_blk, symname);
+	if (!v) {
+		//Could be a function pointer.
+		//Function may be defined later; create incomplete symbol for it already.
+		//Note that forward defs are only allowed on top level (no function defines
+		//inside of functions) so we already know we need to add this to the top
+		//block.
+		v=new_function_sym(buf, symname);
+	}
 	insn_t *insn=new_insn(buf);
 	insn->type=type;
-	insn->label=strdup(label);
+	insn->sym=v;
+}
+
+bool insn_buf_add_function(insn_buf_t *buf, insn_t *insn, const char *name) {
+	symbol_t *v=insn_buf_find_var(buf->cur_blk, name);
+	if (!v) {
+		v=new_function_sym(buf, name);
+	} else {
+		if (v->type!=SYM_TYPE_FUNCTION) {
+			return false;
+		}
+	}
+	v->target=insn;
+	return true;
 }
 
 
 //Does as the name says. Returns amount of stack space needed for all local
-//variables.
+//variables. Also sets the offset for function vars.
 static int find_local_var_size(insn_block_t *blk, int base_pos) {
 	int space_base=0;
-	if (blk->vars) {
-		for (variable_t *v=blk->vars; v!=NULL; v=v->next) {
-			if (!v->is_arg) {
+	if (blk->syms) {
+		for (symbol_t *v=blk->syms; v!=NULL; v=v->next) {
+			if (v->type==SYM_TYPE_LOCAL) {
 				v->offset=base_pos+space_base;
 				space_base+=v->size;
 			}
@@ -290,9 +318,9 @@ static int find_local_var_size(insn_block_t *blk, int base_pos) {
 //The args to functions are stored as positive integers, but the opcode needs
 //negative integers relative to the number of parameters. We convert that here.
 void correct_arg_pos(insn_block_t *blk) {
-	if (blk->vars) {
-		for (variable_t *v=blk->vars; v!=NULL; v=v->next) {
-			if (v->is_arg) {
+	if (blk->syms) {
+		for (symbol_t *v=blk->syms; v!=NULL; v=v->next) {
+			if (v->type==SYM_TYPE_ARG) {
 				assert(v->offset>=0); //should not be corrected yet
 				v->offset=-2-(blk->params-v->offset-1);
 			}
@@ -313,12 +341,34 @@ int insn_buf_fixup(insn_buf_t *buf) {
 	insn_block_t *top=buf->cur_blk;
 	assert(top->parent == NULL);
 
+
+	//Decide final position for each ins. Note that if we do nop removal, we should
+	//do it before here.
+	int pc=0;
+	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
+		i->pos=pc;
+		pc+=lssl_vm_argtypes[lssl_vm_ops[i->type].argtype].byte_size+1;
+	}
+
 	//Collect and fixup global variables.
 	int bp_offset=0;
-	for (variable_t *v=top->vars; v!=NULL; v=v->next) {
-		assert(v->is_global);
-		v->offset=bp_offset;
-		bp_offset+=v->size;
+	for (symbol_t *v=top->syms; v!=NULL; v=v->next) {
+		assert(v->type!=SYM_TYPE_LOCAL && v->type!=SYM_TYPE_ARG);
+		if (v->type==SYM_TYPE_GLOBAL) {
+			v->offset=bp_offset;
+			bp_offset+=v->size;
+		}
+	}
+
+	//Fixup function symbols. Note we only do this in the top block.
+	for (symbol_t *v=top->syms; v!=NULL; v=v->next) {
+		if (v->type==SYM_TYPE_FUNCTION) {
+			if (v->target == NULL) {
+				printf("Error! Undefined variable %s\n", v->name);
+				exit(1);
+			}
+			v->offset=v->target->pos;
+		}
 	}
 
 	for (insn_block_t *blk=top->child; blk!=NULL; blk=blk->sibling) {
@@ -342,17 +392,10 @@ int insn_buf_fixup(insn_buf_t *buf) {
 		} else if (i->type==INSN_RETURN) {
 			i->val=i->block->params;
 		} else if (i->type==INSN_RD_VAR) {
-			if (i->var->is_global) i->type=INSN_RD_G_VAR;
+			if (i->sym->type==SYM_TYPE_GLOBAL) i->type=INSN_RD_G_VAR;
 		} else if (i->type==INSN_WR_VAR) {
-			if (i->var->is_global) i->type=INSN_WR_G_VAR;
+			if (i->sym->type==SYM_TYPE_GLOBAL) i->type=INSN_WR_G_VAR;
 		}
-	}
-
-	//Decide final position for each ins
-	int pc=0;
-	for (insn_t *i=buf->first_insn; i!=NULL; i=i->next) {
-		i->pos=pc;
-		pc++; //todo: variable instruction length?
 	}
 
 	//Fixup targets for e.g. jump instructions
@@ -427,13 +470,13 @@ static void dump_insn(insn_t *insn) {
 	} else if (lssl_vm_ops[i].argtype==ARG_REAL) {
 		printf("%s %f\n", lssl_vm_ops[i].op, (insn->val/65536.0));
 	} else if (lssl_vm_ops[i].argtype==ARG_VAR) {
-		printf("%s [%d] ; %s\n", lssl_vm_ops[i].op, insn->var->offset, insn->var->name);
+		printf("%s [%d] ; %s\n", lssl_vm_ops[i].op, insn->sym->offset, insn->sym->name);
 	} else if (lssl_vm_ops[i].argtype==ARG_LABEL) {
 		printf("%s %d\n", lssl_vm_ops[i].op, insn->val);
 	} else if (lssl_vm_ops[i].argtype==ARG_TARGET) {
 		printf("%s 0x%X\n", lssl_vm_ops[i].op, insn->val);
 	} else if (lssl_vm_ops[i].argtype==ARG_FUNCTION) {
-		printf("%s [%d] ; %s\n", lssl_vm_ops[i].op, insn->val, insn->label);
+		printf("%s [%d] ; %s\n", lssl_vm_ops[i].op, insn->val, insn->sym->name);
 	}
 }
 
@@ -473,4 +516,17 @@ void insn_buf_new_src_pos(insn_buf_t *buf) {
 	buf->src_pos=pos;
 	buf->src_pos_stack=pos;
 }
+
+
+/*
+What do I need to export?
+*** Needed ***
+- Version. Specifically if we're gonna do an enum for syscalls
+- Code. Duh.
+*** Debug info ***
+
+*/
+
+
+
 
