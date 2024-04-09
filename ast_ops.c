@@ -36,7 +36,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 		//Add local vars to list of syms.
 		if (n->type==AST_TYPE_DECLARE) {
 			add_sym(syms, n);
-		} else if (n->type==AST_TYPE_VAR) {
+		} else if (n->type==AST_TYPE_VAR || n->type==AST_TYPE_ASSIGN) {
 			//Find variable symbol and resolve
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (!s) {
@@ -70,6 +70,24 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 	syms->node_pos=old_sym_pos;
 }
 
+//Adds a 'return 0' to the end of the function, if none is there.
+void ast_ops_add_trailing_return(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_FUNCDEF) {
+			ast_node_t *last=n->children;
+			assert(last);
+			while (last->sibling) last=last->sibling;
+			if (last->type!=AST_TYPE_RETURN) {
+				ast_node_t *r=ast_new_node(AST_TYPE_RETURN, &n->loc);
+				ast_add_sibling(last, r);
+				//defaults to an int with value 0
+				ast_add_child(r, ast_new_node(AST_TYPE_INT, &n->loc));
+			}
+		}
+	}
+}
+
+
 //Recursively goes through ast to attach symbols
 void ast_ops_attach_symbol_defs(ast_node_t *node) {
 	ast_sym_list_t *syms=calloc(sizeof(ast_sym_list_t), 1);
@@ -93,16 +111,21 @@ void ast_ops_attach_symbol_defs(ast_node_t *node) {
 	free(syms);
 }
 
-//Assigns a position to the args nodes. Takes a funcdef node
-static void function_number_arguments(ast_node_t *node) {
-	assert(node->type==AST_TYPE_FUNCDEF);
-	//Find out arg count.
+static int arg_size_for_fn(ast_node_t *node) {
 	int arg_size=0;
 	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEFARG) {
 			arg_size++;
 		}
 	}
+	return arg_size;
+}
+
+//Assigns a position to the args nodes. Takes a funcdef node
+static void function_number_arguments(ast_node_t *node) {
+	assert(node->type==AST_TYPE_FUNCDEF);
+	//Find out arg count.
+	int arg_size=arg_size_for_fn(node);
 	//Number args
 	int i=-2-(arg_size-1);
 	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
@@ -170,9 +193,62 @@ int ast_ops_var_place(ast_node_t *node) {
 	return glob_size;
 }
 
+static int ast_ops_position_insns_from(ast_node_t *node, int pc) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_INSN) {
+			n->valpos=pc;
+			pc+=lssl_vm_argtypes[lssl_vm_ops[n->insn_type].argtype].byte_size;
+		}
+		if (n->children) {
+			pc=ast_ops_position_insns_from(n->children, pc);
+		}
+	}
+	return pc;
+}
+
+//Assigns an address to all instructions
+void ast_ops_position_insns(ast_node_t *node) {
+	ast_ops_position_insns_from(node, 0);
+}
+
+void fixup_enter_leave_return(ast_node_t *node, int arg_size, int localsize) {
+	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_INSN) {
+			if (n->insn_type==INSN_RETURN) {
+				n->insn_arg=arg_size;
+			} else if (n->insn_type==INSN_ENTER) {
+				n->insn_arg=localsize;
+			} else if (n->insn_type==INSN_LEAVE) {
+				n->insn_arg=localsize;
+			}
+		}
+		if (n->children) fixup_enter_leave_return(n, arg_size, localsize);
+	}
+}
+
+
+//Fixes up these instructions
+void ast_ops_fixup_enter_leave_return(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_FUNCDEF) {
+			int arg_size=arg_size_for_fn(n);
+			ast_node_t *ls=n->children;
+			while (ls && ls->type!=AST_TYPE_LOCALSIZE) ls=ls->sibling;
+			int localsize=ls->numberi;
+			fixup_enter_leave_return(n, arg_size, localsize);
+		}
+	}
+}
+
+
 //Figure out and set the offsets for functions and other ops taking a target
 void ast_ops_fixup_addrs(ast_node_t *node) {
-
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_INSN && n->value) {
+			n->insn_arg=n->value->valpos;
+		}
+		if (n->children) ast_ops_fixup_addrs(n->children);
+	}
 }
 
 

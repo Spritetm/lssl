@@ -5,13 +5,12 @@
 
 typedef struct insn_t insn_t;
 
-typedef insn_t {
+struct insn_t {
 	lssl_instr_enum type;
 	int arg;
 	int pos;
 	insn_t *next;
-}
-
+};
 
 
 typedef struct insn_buf_t insn_buf_t;

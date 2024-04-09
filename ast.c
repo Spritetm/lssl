@@ -3,9 +3,30 @@
 #include <stdlib.h>
 #include <assert.h>
 #include <string.h>
+#include "vm_defs.h"
 #include "ast.h"
 #include "insn.h"
 
+static void dump_insn(ast_node_t *node) {
+	assert(node->type==AST_TYPE_INSN);
+	int i=node->insn_type;
+	printf("[@%04X] ", node->valpos);
+	if (lssl_vm_ops[i].argtype==ARG_NONE || lssl_vm_ops[i].argtype==ARG_NOP) {
+		printf("%s", lssl_vm_ops[i].op);
+	} else if (lssl_vm_ops[i].argtype==ARG_INT) {
+		printf("%s %d", lssl_vm_ops[i].op, node->insn_arg);
+	} else if (lssl_vm_ops[i].argtype==ARG_REAL) {
+		printf("%s %f", lssl_vm_ops[i].op, (node->insn_arg/65536.0));
+	} else if (lssl_vm_ops[i].argtype==ARG_VAR) {
+		printf("%s [%d] ; %s", lssl_vm_ops[i].op, node->insn_arg, node->value->name);
+	} else if (lssl_vm_ops[i].argtype==ARG_LABEL) {
+		printf("%s %d", lssl_vm_ops[i].op, node->insn_arg);
+	} else if (lssl_vm_ops[i].argtype==ARG_TARGET) {
+		printf("%s 0x%X", lssl_vm_ops[i].op, node->insn_arg);
+	} else if (lssl_vm_ops[i].argtype==ARG_FUNCTION) {
+		printf("%s [%d] ; %s", lssl_vm_ops[i].op, node->insn_arg, node->value->name);
+	}
+}
 
 const static char *ast_type_str[]={
 	"INT", "FLOAT",
@@ -23,6 +44,7 @@ const static char *ast_type_str[]={
 	"DECLARE",
 	"LOCALSIZE",
 	"INST",
+	"RETURN",
 };
 
 
@@ -42,6 +64,10 @@ static void dump_node(ast_node_t *node, int depth) {
 	if (node->type==AST_TYPE_LOCALSIZE) printf(" (%i entries)", node->numberi);
 	if (node->type==AST_TYPE_DECLARE) printf(" (position is %d)", node->valpos);
 	if (node->type==AST_TYPE_FUNCDEFARG) printf(" (position is %d)", node->valpos);
+	if (node->type==AST_TYPE_INSN) {
+		printf(":\t");
+		dump_insn(node);
+	}
 	printf("\n");
 	//Dump all children
 	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {

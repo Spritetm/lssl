@@ -62,6 +62,7 @@ hexdigit	[0-9A-Fa-f]
 "while"					{ return TOKEN_WHILE;	}
 "if"					{ return TOKEN_IF;		}
 "function"				{ return TOKEN_FUNCTION;}
+"return"				{ return TOKEN_RETURN;	}
 [a-zA-Z0-9_]+			{ (yylval)->str=strdup(yytext); return TOKEN_STR; }
 
 " "

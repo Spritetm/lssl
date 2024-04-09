@@ -21,7 +21,8 @@ typedef enum {
 	AST_TYPE_VAR,
 	AST_TYPE_DECLARE,
 	AST_TYPE_LOCALSIZE,
-	AST_TYPE_INST,
+	AST_TYPE_INSN,
+	AST_TYPE_RETURN,
 	AST_TYPE_MAX //always last item
 } ast_type_en;
 
@@ -32,12 +33,13 @@ struct ast_node_t {
 	float numberf;
 	char *str;
 	file_loc_t loc;
-	insn_t *insns;
 	ast_node_t *value; //e.g. the node for a var def in case of a var ref, of func def for func ref
 	int valpos; //actual location in memory of value
 	ast_node_t *parent;
 	ast_node_t *children;
 	ast_node_t *sibling;
+	lssl_instr_enum insn_type;
+	int insn_arg;
 };
 
 static inline void ast_add_child(ast_node_t *parent, ast_node_t *n) {

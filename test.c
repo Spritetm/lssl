@@ -4,6 +4,7 @@
 #include "lexer_gen.h"
 #include "parser.h"
 #include "ast_ops.h"
+#include "codegen.h"
 
 int main(int argc, char **argv) {
 	char buf[1024*1024];
@@ -29,9 +30,12 @@ int main(int argc, char **argv) {
 	yyparse(&prognode, myscanner);
 
 	ast_ops_attach_symbol_defs(prognode);
+	ast_ops_add_trailing_return(prognode);
 	ast_ops_var_place(prognode);
-//	ast_ops_codegen(prognode);
-//	ast_ops_fixup_addrs(prognode);
+	codegen(prognode);
+	ast_ops_position_insns(prognode);
+	ast_ops_fixup_enter_leave_return(prognode);
+	ast_ops_fixup_addrs(prognode);
 	ast_dump(prognode);
 
 //	insn_buf_fixup(ibuf);

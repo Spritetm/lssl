@@ -47,6 +47,7 @@ while (0)
 %token TOKEN_FOR TOKEN_WHILE TOKEN_IF
 %token TOKEN_FUNCTION
 %token TOKEN_EQ TOKEN_NEQ TOKEN_L TOKEN_G TOKEN_LEQ TOKEN_GEQ
+%token TOKEN_RETURN
 
 %define api.pure full
 %parse-param {ast_node_t **program}
@@ -67,7 +68,7 @@ while (0)
 %type<ast> input input_line statement block funcdef stdaloneexpr
 %type<ast> funcdefargs while_statement if_statement for_statement assignment
 %type<ast> vardef expr compf factor br_term term func_call funccallargs
-%type<ast> funcdefarg
+%type<ast> funcdefarg return_statement
 
 %%
 
@@ -112,6 +113,7 @@ statement: %empty {
 | for_statement
 | while_statement
 | if_statement
+| return_statement
 
 
 stdaloneexpr: expr {
@@ -178,6 +180,17 @@ vardef: TOKEN_VAR TOKEN_STR {
 		ast_add_sibling($$, a);
 		ast_add_child(a, $4);
 	}
+
+return_statement: TOKEN_RETURN {
+		$$=ast_new_node(AST_TYPE_RETURN, &@$);
+		ast_node_t *a=ast_new_node(AST_TYPE_INT, &@$);
+		a->numberi=0;
+		ast_add_child($$, a);
+}
+| TOKEN_RETURN expr {
+		$$=ast_new_node(AST_TYPE_RETURN, &@$);
+		ast_add_child($$, $2);
+}
 
 expr: compf
 | expr TOKEN_EQ compf {   $$=ast_new_node_2chld(AST_TYPE_TEQ, &@$, $1, $3); }
