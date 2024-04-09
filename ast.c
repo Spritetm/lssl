@@ -2,7 +2,9 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <assert.h>
+#include <string.h>
 #include "ast.h"
+#include "insn.h"
 
 
 const static char *ast_type_str[]={
@@ -19,6 +21,8 @@ const static char *ast_type_str[]={
 	"ASSIGN",
 	"VAR",
 	"DECLARE",
+	"LOCALSIZE",
+	"INST",
 };
 
 
@@ -33,6 +37,11 @@ static void dump_node(ast_node_t *node, int depth) {
 	}
 	printf(ast_type_str[node->type]);
 	if (node->name) printf(" '%s'", node->name);
+	if (node->type==AST_TYPE_INT) printf(" (%d)", node->numberi);
+	if (node->type==AST_TYPE_FLOAT) printf(" (%f)", node->numberf);
+	if (node->type==AST_TYPE_LOCALSIZE) printf(" (%i entries)", node->numberi);
+	if (node->type==AST_TYPE_DECLARE) printf(" (position is %d)", node->valpos);
+	if (node->type==AST_TYPE_FUNCDEFARG) printf(" (position is %d)", node->valpos);
 	printf("\n");
 	//Dump all children
 	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
@@ -47,16 +56,17 @@ void ast_dump(ast_node_t *node) {
 	printf("dumped\n");
 }
 
-ast_node_t *ast_new_node(ast_type_en type) {
+ast_node_t *ast_new_node(ast_type_en type, file_loc_t *loc) {
 	ast_node_t *r=calloc(sizeof(ast_node_t), 1);
 	r->type=type;
+	memcpy(&r->loc, loc, sizeof(file_loc_t));
 	return r;
 }
 
-ast_node_t *ast_new_node_2chld(ast_type_en type, ast_node_t *c1, ast_node_t *c2) {
+ast_node_t *ast_new_node_2chld(ast_type_en type, file_loc_t *loc, ast_node_t *c1, ast_node_t *c2) {
 	assert(c1->sibling==NULL);
 	assert(c2->sibling==NULL);
-	ast_node_t *r=ast_new_node(type);
+	ast_node_t *r=ast_new_node(type, loc);
 	r->children=c1;
 	c1->sibling=c2;
 	return r;

@@ -3,6 +3,8 @@
 #include <math.h>
 #include "lexer.h"
 #include "lexer_gen.h"
+#include "ast.h"
+#include "error.h"
 
 
 
@@ -95,7 +97,7 @@ input_line: statement TOKEN_EOL
 | block
 
 block: TOKEN_CURLOPEN input TOKEN_CURLCLOSE {
-		$$=ast_new_node(AST_TYPE_BLOCK);
+		$$=ast_new_node(AST_TYPE_BLOCK, &@$);
 		$$->children=$2;
 		$2->parent=$$;
 	}
@@ -114,18 +116,18 @@ statement: %empty {
 
 stdaloneexpr: expr {
 		//eval the expr but ignore the result
-		$$=ast_new_node(AST_TYPE_DROP);
+		$$=ast_new_node(AST_TYPE_DROP, &@$);
 		$$->children=$1;
 	}
 
 funcdef: TOKEN_FUNCTION TOKEN_STR TOKEN_LPAREN funcdefargs TOKEN_RPAREN TOKEN_CURLOPEN input TOKEN_CURLCLOSE {
-		$$=ast_new_node(AST_TYPE_FUNCDEF);
+		$$=ast_new_node(AST_TYPE_FUNCDEF, &@$);
 		$$->name=strdup($2);
 		ast_add_child($$, $4);
 		ast_add_child($$, $7);
 	}
 
-funcdefargs: %empty
+funcdefargs: %empty { $$=NULL; }
 | funcdefarg
 | funcdefargs TOKEN_COMMA funcdefarg {
 	ast_add_sibling($1, $3);
@@ -133,24 +135,24 @@ funcdefargs: %empty
 }
 
 funcdefarg: TOKEN_STR {
-		$$=ast_new_node(AST_TYPE_FUNCDEFARG);
+		$$=ast_new_node(AST_TYPE_FUNCDEFARG, &@$);
 		$$->name=strdup($1);
 	}
 
 while_statement: TOKEN_WHILE TOKEN_LPAREN expr TOKEN_RPAREN input_line {
-		$$=ast_new_node(AST_TYPE_WHILE);
+		$$=ast_new_node(AST_TYPE_WHILE, &@$);
 		ast_add_child($$, $3);
 		ast_add_child($$, $5);
 	}
 
 if_statement: TOKEN_IF TOKEN_LPAREN expr TOKEN_RPAREN input_line {
-		$$=ast_new_node(AST_TYPE_IF);
+		$$=ast_new_node(AST_TYPE_IF, &@$);
 		ast_add_child($$, $3);
 		ast_add_child($$, $5);
 	}
 
 for_statement: TOKEN_FOR TOKEN_LPAREN statement TOKEN_SEMICOLON expr TOKEN_SEMICOLON statement TOKEN_RPAREN input_line {
-		$$=ast_new_node(AST_TYPE_FOR);
+		$$=ast_new_node(AST_TYPE_FOR, &@$);
 		ast_add_child($$, $3);
 		ast_add_child($$, $5);
 		ast_add_child($$, $7);
@@ -158,40 +160,40 @@ for_statement: TOKEN_FOR TOKEN_LPAREN statement TOKEN_SEMICOLON expr TOKEN_SEMIC
 	}
 
 assignment: TOKEN_STR TOKEN_ASSIGN expr {
-		$$=ast_new_node(AST_TYPE_ASSIGN);
+		$$=ast_new_node(AST_TYPE_ASSIGN, &@$);
 		$$->name=strdup($1);
 		ast_add_child($$, $3);
 	}
 
 vardef: TOKEN_VAR TOKEN_STR {
-		$$=ast_new_node(AST_TYPE_DECLARE);
+		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->name=strdup($2);
 	}
 | TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
-		$$=ast_new_node(AST_TYPE_DECLARE);
+		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->name=strdup($2);
 
-		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN);
+		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN, &@$);
 		a->name=strdup($2);
 		ast_add_sibling($$, a);
 		ast_add_child(a, $4);
 	}
 
 expr: compf
-| expr TOKEN_EQ compf {   $$=ast_new_node_2chld(AST_TYPE_TEQ, $1, $3); }
-| expr TOKEN_NEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TNEQ, $1, $3); }
-| expr TOKEN_L compf {    $$=ast_new_node_2chld(AST_TYPE_TL, $1, $3); }
-| expr TOKEN_G compf {    $$=ast_new_node_2chld(AST_TYPE_TL, $3, $1); }
-| expr TOKEN_LEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TLEQ, $1, $3); }
-| expr TOKEN_GEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TLEQ, $3, $1); }
+| expr TOKEN_EQ compf {   $$=ast_new_node_2chld(AST_TYPE_TEQ, &@$, $1, $3); }
+| expr TOKEN_NEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TNEQ, &@$, $1, $3); }
+| expr TOKEN_L compf {    $$=ast_new_node_2chld(AST_TYPE_TL, &@$, $1, $3); }
+| expr TOKEN_G compf {    $$=ast_new_node_2chld(AST_TYPE_TL, &@$, $3, $1); }
+| expr TOKEN_LEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TLEQ, &@$, $1, $3); }
+| expr TOKEN_GEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TLEQ, &@$, $3, $1); }
 
 compf: factor
-| compf TOKEN_PLUS factor {  $$=ast_new_node_2chld(AST_TYPE_PLUS, $1, $3); }
-| compf TOKEN_MINUS factor { $$=ast_new_node_2chld(AST_TYPE_MINUS, $1, $3); }
+| compf TOKEN_PLUS factor {  $$=ast_new_node_2chld(AST_TYPE_PLUS, &@$, $1, $3); }
+| compf TOKEN_MINUS factor { $$=ast_new_node_2chld(AST_TYPE_MINUS, &@$, $1, $3); }
 
 factor: br_term
-| factor TOKEN_TIMES br_term { $$=ast_new_node_2chld(AST_TYPE_TIMES, $1, $3); }
-| factor TOKEN_SLASH br_term { $$=ast_new_node_2chld(AST_TYPE_DIVIDE, $1, $3); }
+| factor TOKEN_TIMES br_term { $$=ast_new_node_2chld(AST_TYPE_TIMES, &@$, $1, $3); }
+| factor TOKEN_SLASH br_term { $$=ast_new_node_2chld(AST_TYPE_DIVIDE, &@$, $1, $3); }
 
 br_term: term
 | TOKEN_LPAREN expr TOKEN_RPAREN {
@@ -199,27 +201,27 @@ br_term: term
 	}
 
 term: TOKEN_NUMBERI { 
-		$$=ast_new_node(AST_TYPE_INT);
+		$$=ast_new_node(AST_TYPE_INT, &@$);
 		$$->numberi=$1;
 	 }
 | TOKEN_NUMBERF { 
-		$$=ast_new_node(AST_TYPE_FLOAT);
+		$$=ast_new_node(AST_TYPE_FLOAT, &@$);
 		$$->numberf=$1;
 	}
 | TOKEN_STR { 
-		$$=ast_new_node(AST_TYPE_VAR);
+		$$=ast_new_node(AST_TYPE_VAR, &@$);
 		$$->name=strdup($1);
 	}
 | func_call
 
 
 func_call: TOKEN_STR TOKEN_LPAREN funccallargs TOKEN_RPAREN {
-		$$=ast_new_node(AST_TYPE_FUNCCALL);
+		$$=ast_new_node(AST_TYPE_FUNCCALL, &@$);
 		$$->name=strdup($1);
 		ast_add_child($$, $3);
 	}
 
-funccallargs: %empty
+funccallargs: %empty { $$=NULL; }
 | expr
 | funccallargs TOKEN_COMMA expr {
 	ast_add_sibling($1, $3);

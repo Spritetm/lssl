@@ -3,7 +3,6 @@
     #include <string.h>
 	#include "lexer.h"
 	#include "parser.h"
-	#include "insn_buf.h"
 
 	//from https://stackoverflow.com/questions/656703/how-does-flex-support-bison-location-exactly
 	#define YY_USER_ACTION \
@@ -21,13 +20,7 @@
 			yylloc->pos_end++; \
 		}
 
-    void yyerror (const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, char const *msg) {
-		printf("Error: %s on line %d col %d\n", msg, loc->first_line, loc->first_column);
-	}
-
 %}
-
-
 
 %option warn nodefault
 %option reentrant bison-bridge
@@ -40,8 +33,6 @@ digit		[0-9]
 hexdigit	[0-9A-Fa-f]
 
 %%
-
-
 
 "//".*"\n"				{ return TOKEN_EOL;			}
 "\n"					{ return TOKEN_EOL;			}

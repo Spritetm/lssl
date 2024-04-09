@@ -1,5 +1,7 @@
 #pragma once
 #include <stdint.h>
+#include "file_loc.h"
+#include "insn.h"
 
 typedef struct ast_node_t ast_node_t;
 
@@ -18,9 +20,10 @@ typedef enum {
 	AST_TYPE_ASSIGN,
 	AST_TYPE_VAR,
 	AST_TYPE_DECLARE,
+	AST_TYPE_LOCALSIZE,
+	AST_TYPE_INST,
 	AST_TYPE_MAX //always last item
 } ast_type_en;
-
 
 struct ast_node_t {
 	int type;
@@ -28,6 +31,10 @@ struct ast_node_t {
 	int32_t numberi;
 	float numberf;
 	char *str;
+	file_loc_t loc;
+	insn_t *insns;
+	ast_node_t *value; //e.g. the node for a var def in case of a var ref, of func def for func ref
+	int valpos; //actual location in memory of value
 	ast_node_t *parent;
 	ast_node_t *children;
 	ast_node_t *sibling;
@@ -49,8 +56,8 @@ static inline void ast_add_sibling(ast_node_t *t, ast_node_t *n) {
 }
 
 
-ast_node_t *ast_new_node(ast_type_en type);
-ast_node_t *ast_new_node_2chld(ast_type_en type, ast_node_t *c1, ast_node_t *c2);
+ast_node_t *ast_new_node(ast_type_en type, file_loc_t *loc);
+ast_node_t *ast_new_node_2chld(ast_type_en type, file_loc_t *loc, ast_node_t *c1, ast_node_t *c2);
 void ast_dump(ast_node_t *node);
 
 

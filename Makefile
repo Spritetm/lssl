@@ -5,14 +5,15 @@ default: test
 lexer.c lexer_gen.h: lexer.l
 	flex --header-file=lexer_gen.h -o lexer.c  $^
 
-parser.c parser.h: parser.y
-	bison --header=parser.h --output=parser.c $^
+parser.c parser_gen.h: parser.y
+	bison --header=parser_gen.h --output=parser.c $^
 
-test.o: lexer_gen.h parser.h
+test.o: lexer_gen.h parser_gen.h
 
-test: test.o lexer.o parser.o vm_defs.o ast.o
+test: test.o lexer.o parser.o vm_defs.o ast.o error.o ast_ops.o
 	$(CC) $(CFLAGS) -o $@  $^ -lm
 
 clean:
 	rm -f test.o lexer.o parser.o insn_buf.o vm_defs.o
-	rm -f parser.c parser.h lexer.c lexer_gen.h
+	rm -f error.o ast_ops.o
+	rm -f parser.c parser_gen.h lexer.c lexer_gen.h

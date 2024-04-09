@@ -4,42 +4,6 @@
 #include <assert.h>
 #include "insn_buf.h"
 
-/*
-We can use one stack.
-Note that statements use the stack, but they will *always* pop as much as they
-push. This means that when entering a block { }, the stack pointer *always* will
-be what it is at the start of the function.
-
-After we parsed a function, we can know what the max of local variables is, and
-in the function entry, we can reserve that amount of space on the stack. We can then
-use relative addressing wrt a base pointer to address the local variables.
-
-So in other words:
-
-CALL fn:
- - push all arguments
- - push BP
- - push IP
- - jmp subroutine
-
-subroutine:
-ENTER xx 
-	- shifts SP up by XX
-
-RET xx
-	- pops retval from stack
-	- shifts SP down by XX
-	- pop IP
-	- pop BP
-	- pushes retval to stack
-
-
-var fixup:
-	- get total amount of vars so we can adjust the ENTER and RET instructions
-	- give each var a position, relative to BP
-	- go through all the blocks, convert var pointer into position
-*/
-
 typedef struct symbol_t symbol_t;
 typedef struct insn_block_t insn_block_t;
 

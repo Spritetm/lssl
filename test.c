@@ -1,8 +1,9 @@
 #include <stdio.h>
-#include "insn_buf.h"
+#include <stdlib.h>
 #include "lexer.h"
 #include "lexer_gen.h"
 #include "parser.h"
+#include "ast_ops.h"
 
 int main(int argc, char **argv) {
 	char buf[1024*1024];
@@ -27,6 +28,10 @@ int main(int argc, char **argv) {
 
 	yyparse(&prognode, myscanner);
 
+	ast_ops_attach_symbol_defs(prognode);
+	ast_ops_var_place(prognode);
+//	ast_ops_codegen(prognode);
+//	ast_ops_fixup_addrs(prognode);
 	ast_dump(prognode);
 
 //	insn_buf_fixup(ibuf);
