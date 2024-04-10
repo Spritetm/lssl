@@ -113,6 +113,14 @@ static void codegen_node(ast_node_t *n) {
 		ast_node_t *j=insert_insn_after_arg_eval(n, INSN_NOP, 2);
 		i->value=j;
 	} else if (n->type==AST_TYPE_WHILE) {
+		ast_node_t *h=insert_insn_before_arg_eval(n, INSN_NOP);
+		codegen_node(nth_param(n, 1)); //condition
+		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_JZ, 1);
+		codegen_node(nth_param(n, 2)); //body
+		ast_node_t *j=insert_insn_after_arg_eval(n, INSN_JMP, 2);
+		j->value=h;
+		ast_node_t *k=insert_insn_after_arg_eval(n, INSN_NOP, 2);
+		i->value=k;
 	} else if (n->type==AST_TYPE_TEQ) {
 		handle_rhs_lhs_op(n, INSN_TEQ);
 	} else if (n->type==AST_TYPE_TNEQ) {
@@ -122,13 +130,15 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_TLEQ) {
 		handle_rhs_lhs_op(n, INSN_TLEQ);
 	} else if (n->type==AST_TYPE_FUNCDEF) {
-		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_ENTER);
+		insert_insn_before_arg_eval(n, INSN_ENTER);
 		codegen(n->children);
 	} else if (n->type==AST_TYPE_FUNCDEFARG) {
+		//na
 	} else if (n->type==AST_TYPE_FUNCCALL) {
 		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_CALL);
 		i->value=n->value; //todo: this is the node of the fn, not of the 1st instr.
 	} else if (n->type==AST_TYPE_FUNCCALLARG) {
+		//na
 	} else if (n->type==AST_TYPE_BLOCK) {
 		codegen(n->children);
 	} else if (n->type==AST_TYPE_DROP) {
@@ -146,7 +156,9 @@ static void codegen_node(ast_node_t *n) {
 		insert_insn_after_arg_eval(n, INSN_LEAVE, 1);
 		insert_insn_after_arg_eval(n, INSN_RETURN, 1);
 	} else if (n->type==AST_TYPE_DECLARE) {
+		//na
 	} else if (n->type==AST_TYPE_LOCALSIZE) {
+		//na, enter/leave is resolved elsewhere
 	} else if (n->type==AST_TYPE_INSN) {
 		//ignore
 	} else {

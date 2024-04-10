@@ -4,7 +4,8 @@
 #include <assert.h>
 #include "ast.h"
 
-//Mental node: definition of 'fixup' is finding a position (e.g. in ram) for a symbol.
+//Mental node: definition of 'fixup' is finding a position (e.g. in ram) for a symbol and changing
+//the instructions to match that.
 
 
 typedef struct {
