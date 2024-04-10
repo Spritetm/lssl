@@ -162,15 +162,7 @@ static int block_place_locals(ast_node_t * node, int start_pos) {
 
 //Figure out and set the offsets of variables and func args
 //Returns size of globals.
-int ast_ops_var_place(ast_node_t *node) {
-	//Find globals first.
-	int glob_size=0;
-	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DECLARE) {
-			n->valpos=glob_size;
-			glob_size++;
-		}
-	}
+void ast_ops_var_place(ast_node_t *node) {
 
 	//Number arguments
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
@@ -190,9 +182,22 @@ int ast_ops_var_place(ast_node_t *node) {
 			n->children=d;
 		}
 	}
-
-	return glob_size;
 }
+
+//Replaces instructions like 'ENTER 0' with NOPs
+void ast_ops_remove_useless_ops(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_INSN) {
+			if (n->insn_type==INSN_ENTER && n->insn_arg==0) {
+				n->insn_type=INSN_NOP;
+			} else if (n->insn_type==INSN_LEAVE && n->insn_arg==0) {
+				n->insn_type=INSN_NOP;
+			}
+		}
+		if (n->children) ast_ops_remove_useless_ops(n->children);
+	}
+}
+
 
 static int ast_ops_position_insns_from(ast_node_t *node, int pc) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
@@ -252,7 +257,111 @@ void ast_ops_fixup_addrs(ast_node_t *node) {
 	}
 }
 
+int find_pc_for_fn(ast_node_t *node) {
+	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_INSN) {
+			return n->valpos;
+		}
+		if (n->children) {
+			int r=find_pc_for_fn(n->children);
+			if (r>=0) return r;
+		}
+	}
+	return -1;
+}
+
+//Assign the funcdef node the address of the first instruction of the function.
+//This makes it easier to resolve this later.
+void ast_ops_assign_addr_to_fndef_node(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_FUNCDEF) {
+			int r=find_pc_for_fn(n);
+			assert(r>=0);
+			n->valpos=r;
+		}
+	}
+}
+
+#define PROG_INC 1024
+
+typedef struct {
+	int len;
+	int size;
+	uint8_t *data;
+} prog_t;
+
+static void add_byte_prog(prog_t *p, uint8_t b) {
+	if (p->len==p->size) {
+		p->size+=PROG_INC;
+		p->data=realloc(p->data, p->size);
+	}
+	p->data[p->len++]=b;
+}
+
+static void add_word_prog(prog_t *p, uint16_t b) {
+	add_byte_prog(p, (b)&0xff);
+	add_byte_prog(p, (b>>8)&0xff);
+}
+
+static void add_long_prog(prog_t *p, uint32_t b) {
+	add_word_prog(p, (b)&0xffff);
+	add_word_prog(p, (b>>16)&0xffff);
+}
+
+static void gen_binary(ast_node_t *node, prog_t *p) {
+	for (ast_node_t *i=node; i!=NULL; i=i->sibling) {
+		if (i->type==AST_TYPE_INSN) {
+			int size=lssl_vm_argtypes[lssl_vm_ops[i->insn_type].argtype].byte_size;
+			if (size!=0) {
+				add_byte_prog(p, i->insn_type);
+				if (size==1) {
+					//no args
+				} else if (size==2) {
+					add_byte_prog(p, i->insn_arg);
+				} else if (size==3) {
+					add_word_prog(p, i->insn_arg);
+				} else if (size==5) {
+					add_long_prog(p, i->insn_arg);
+				} else {
+					assert(0 && "Invalid byte size for insn type");
+				}
+			}
+		}
+		if (i->children) gen_binary(i->children, p);
+	}
+}
+
+static int globals_size(ast_node_t *node) {
+	//Find globals first.
+	int glob_size=0;
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_DECLARE) {
+			n->valpos=glob_size;
+			glob_size++;
+		}
+	}
+	return glob_size;
+}
+
+static int initial_pc(ast_node_t *node, const char *main_fn_name) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_FUNCDEF && strcmp(n->name, main_fn_name)==0) {
+			return n->valpos;
+		}
+	}
+	printf("Warning: no main function %s found. Using first function defined instead.\n", main_fn_name);
+	return 0;
+}
 
 
-
-
+uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
+	prog_t p={};
+	p.size=PROG_INC;
+	p.data=malloc(PROG_INC);
+	add_long_prog(&p, VM_VER);
+	add_long_prog(&p, globals_size(node));
+	add_long_prog(&p, initial_pc(node, "main"));
+	gen_binary(node, &p);
+	*len=p.len;
+	return p.data;
+}

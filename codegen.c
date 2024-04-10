@@ -136,7 +136,9 @@ static void codegen_node(ast_node_t *n) {
 		//na
 	} else if (n->type==AST_TYPE_FUNCCALL) {
 		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_CALL);
-		i->value=n->value; //todo: this is the node of the fn, not of the 1st instr.
+		//note: this is the node of the fn, not of the 1st instr. We assign
+		//that node the correct addr later.
+		i->value=n->value; 
 	} else if (n->type==AST_TYPE_FUNCCALLARG) {
 		//na
 	} else if (n->type==AST_TYPE_BLOCK) {

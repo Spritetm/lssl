@@ -1,6 +1,11 @@
 #pragma once
 #include <stdint.h>
 
+//Increase this if you mess with instructions, argtypes  or syscalls
+//It makes previous binaries incompatible with the VM, forcing the user
+//to do a recompile.
+#define VM_VER 1
+
 //We use some Deeper C Preprocessor Magic so we can keep the instruction defs and arg
 //types in one place, and generate enums/structs/... from that. This keeps them from 
 //going out of sync.
