@@ -29,8 +29,11 @@ int main(int argc, char **argv) {
 
 	yyparse(&prognode, myscanner);
 
+	ast_ops_fix_parents(prognode);
 	ast_ops_attach_symbol_defs(prognode);
+	ast_ops_fix_parents(prognode);
 	ast_ops_add_trailing_return(prognode);
+	ast_ops_fix_parents(prognode);
 	ast_ops_var_place(prognode);
 	codegen(prognode);
 	ast_ops_position_insns(prognode);

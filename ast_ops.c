@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include "ast.h"
+#include "error.h"
 
 //Mental node: definition of 'fixup' is finding a position (e.g. in ram) for a symbol and changing
 //the instructions to match that.
@@ -37,15 +38,17 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 		//Add local vars to list of syms.
 		if (n->type==AST_TYPE_DECLARE) {
 			add_sym(syms, n);
+		} else if (n->type==AST_TYPE_FUNCDEFARG) {
+			add_sym(syms, n);
 		} else if (n->type==AST_TYPE_VAR || n->type==AST_TYPE_ASSIGN) {
 			//Find variable symbol and resolve
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (!s) {
-				printf("Undefined var/function %s\n", n->name);
+				panic_error(n, "Undefined var/function %s", n->name);
 				exit(1);
 			}
 			if (s->type==AST_TYPE_FUNCDEF) {
-				printf("Cannot use function %s in expression! (Forgot the brackets?)\n", s->name);
+				panic_error(n, "Cannot use function %s in expression! (Forgot the brackets?)", n->name);
 				exit(1);
 			}
 			n->value=s;
@@ -55,7 +58,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (s) {
 				if (s->type!=AST_TYPE_FUNCDEF) {
-					printf("Cannot call non-function %s\n", s->name);
+					panic_error(n, "Cannot call non-function %s", n->name);
 					exit(1);
 				}
 				n->value=s;
@@ -68,7 +71,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 					}
 				}
 				if (callno==-1) {
-					printf("Undefined var/function %s\n", n->name);
+					panic_error(n, "Undefined var/function %s", n->name);
 					exit(1);
 				} else {
 					//Yep, syscall. Change parameter.
@@ -294,6 +297,22 @@ void ast_ops_assign_addr_to_fndef_node(ast_node_t *node) {
 			n->valpos=r;
 		}
 	}
+}
+
+static void fix_parents(ast_node_t *node, ast_node_t *parent) {
+	while (node) {
+		node->parent=parent;
+		if (node->children) {
+			fix_parents(node->children, node);
+		}
+		node=node->sibling;
+	}
+}
+
+//Parsing and other ops may not set the parent correctly, but they will
+//set the children properly. This fixes the parent property.
+void ast_ops_fix_parents(ast_node_t *node) {
+	fix_parents(node, NULL);
 }
 
 #define PROG_INC 1024
