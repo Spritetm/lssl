@@ -53,15 +53,29 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 			//Find function symbol and resolve. ToDo: check if
 			//function arg types correspond to declared arg types.
 			ast_node_t *s=find_symbol(syms, n->name);
-			if (!s) {
-				printf("Undefined var/function %s\n", n->name);
-				exit(1);
+			if (s) {
+				if (s->type!=AST_TYPE_FUNCDEF) {
+					printf("Cannot call non-function %s\n", s->name);
+					exit(1);
+				}
+				n->value=s;
+			} else {
+				//Perhaps it's a syscall?
+				int callno=-1;
+				for (int i=0; i<lssl_vm_syscalls_ct; i++) {
+					if (strcmp(lssl_vm_syscalls[i].name, n->name)==0) {
+						callno=i;
+					}
+				}
+				if (callno==-1) {
+					printf("Undefined var/function %s\n", n->name);
+					exit(1);
+				} else {
+					//Yep, syscall. Change parameter.
+					n->type=AST_TYPE_SYSCALL;
+					n->valpos=callno;
+				}
 			}
-			if (s->type!=AST_TYPE_FUNCDEF) {
-				printf("Cannot call non-function %s\n", s->name);
-				exit(1);
-			}
-			n->value=s;
 		}
 		//Recursively process sub-nodes
 		if (n->children) annotate_symbols(n->children, syms);
@@ -358,7 +372,7 @@ uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 	prog_t p={};
 	p.size=PROG_INC;
 	p.data=malloc(PROG_INC);
-	add_long_prog(&p, VM_VER);
+	add_long_prog(&p, LSSL_VM_VER);
 	add_long_prog(&p, globals_size(node));
 	add_long_prog(&p, initial_pc(node, "main"));
 	gen_binary(node, &p);

@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <math.h>
+#include <stdlib.h>
 #include "vm_syscall.h"
 #include "vm_defs.h"
 
@@ -45,13 +47,13 @@ SYSCALL_FUNCTION(mod) {
 }
 
 SYSCALL_FUNCTION(rand) {
-	return (rand()%(arg[2]-arg[1]))+rand[1];
+	return (rand()%(arg[2]-arg[1]))+arg[1];
 }
 
-typedef (int32_t)(*syscall_fn_t)(int32_t *args, int argct);
+typedef int32_t (syscall_fn_t)(int32_t *args, int argct);
 
 #define LSSL_SYSCALL_ENTRY(name, paramcount) syscall_##name,
-static const syscall_fn_t *syscall_list[]={
+static syscall_fn_t *syscall_list[]={
 	LSSL_SYSCALLS
 };
 #undef LSSL_SYSCALL_ENTRY

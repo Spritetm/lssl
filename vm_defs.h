@@ -4,7 +4,7 @@
 //Increase this if you mess with instructions, argtypes  or syscalls
 //It makes previous binaries incompatible with the VM, forcing the user
 //to do a recompile.
-#define VM_VER 1
+#define LSSL_VM_VER 1
 
 //We use some Deeper C Preprocessor Magic so we can keep the instruction defs and arg
 //types in one place, and generate enums/structs/... from that. This keeps them from 
@@ -42,8 +42,6 @@
 	LSSL_INS_ENTRY(JMP, ARG_TARGET) \
 	LSSL_INS_ENTRY(JNZ, ARG_TARGET) \
 	LSSL_INS_ENTRY(JZ, ARG_TARGET) \
-	LSSL_INS_ENTRY(VAR, ARG_INT) \
-	LSSL_INS_ENTRY(VARI, ARG_NONE) \
 	LSSL_INS_ENTRY(ENTER, ARG_INT) \
 	LSSL_INS_ENTRY(LEAVE, ARG_INT) \
 	LSSL_INS_ENTRY(RETURN, ARG_INT) \
@@ -54,9 +52,11 @@
 	LSSL_INS_ENTRY(TL, ARG_NONE) \
 	LSSL_INS_ENTRY(TG, ARG_NONE) \
 	LSSL_INS_ENTRY(TLEQ, ARG_NONE) \
-	LSSL_INS_ENTRY(TGEQ, ARG_NONE)
+	LSSL_INS_ENTRY(TGEQ, ARG_NONE) \
+	LSSL_INS_ENTRY(SYSCALL, ARG_INT)
 
 //name of syscall, no of params
+//note: syscalls are stored as negative numbers starting at -1
 //note: maybe rework args to indicate type?
 #define LSSL_SYSCALLS \
 	LSSL_SYSCALL_ENTRY(abs, 1) \
@@ -112,4 +112,4 @@ typedef struct {
 extern const lssl_vm_op_t lssl_vm_ops[];
 extern const lssl_vm_argtype_t lssl_vm_argtypes[];
 extern const lssl_vm_syscall_t lssl_vm_syscalls[];
-
+extern const int lssl_vm_syscalls_ct;

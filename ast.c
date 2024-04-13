@@ -45,6 +45,7 @@ const static char *ast_type_str[]={
 	"LOCALSIZE",
 	"INST",
 	"RETURN",
+	"SYSCALL",
 };
 
 
@@ -57,7 +58,7 @@ static void dump_node(ast_node_t *node, int depth) {
 		printf("NULL\n");
 		return;
 	}
-	printf(ast_type_str[node->type]);
+	printf("%s", ast_type_str[node->type]);
 	if (node->name) printf(" '%s'", node->name);
 	if (node->type==AST_TYPE_INT) printf(" (%d)", node->numberi);
 	if (node->type==AST_TYPE_FLOAT) printf(" (%f)", node->numberf);

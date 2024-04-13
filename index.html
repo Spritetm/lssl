@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en-us">
+	<head>
+		<meta charset="utf-8">
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>LedStrip Shader Language console thingy</title>
+		<script type='text/javascript'>
+			var Module = {
+				print: (function(...args) {
+					var text = args.join(' ');
+					console.log(text);
+				}),
+			};
+		</script>
+		<script type="text/javascript" src="lssl.js"></script>
+		<script type="text/javascript" src="index.js"></script>
+	</head>
+	<body>
+		<textarea id="code_text" rows="15" cols="80">
+function set_led(pos, time){
+	var a=pos*0.01+time*0.1;
+	var r=sin(a)*127+128;
+	var g=sin(a+2.1)*127+128;
+	var b=sin(a+4.2)*127+128;
+	led_set_rgb(r, g, b);
+}
+
+function main() {
+	set_led_cb(set_led);
+}
+		</textarea>
+		<br>
+		<input type="submit" id="compile_btn" value="compile">
+	</body>
+</html>

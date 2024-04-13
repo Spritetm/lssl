@@ -23,6 +23,7 @@ typedef enum {
 	AST_TYPE_LOCALSIZE,
 	AST_TYPE_INSN,
 	AST_TYPE_RETURN,
+	AST_TYPE_SYSCALL,
 	AST_TYPE_MAX //always last item
 } ast_type_en;
 
