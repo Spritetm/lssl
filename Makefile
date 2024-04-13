@@ -10,16 +10,16 @@ parser.c parser_gen.h: parser.y
 
 test.o: lexer_gen.h parser_gen.h
 
-test: test.o lexer.o parser.o vm_defs.o ast.o error.o ast_ops.o codegen.o led_syscalls.o vm_syscall.o
+test: test.o lexer.o parser.o vm_defs.o ast.o error.o ast_ops.o codegen.o led_syscalls.o vm_syscall.o vm.o
 	$(CC) $(CFLAGS) -o $@  $^ -lm
 
 vm: vm_defs.o vm.o vm_syscall.o vm_runner.o led_syscalls.o
 	$(CC) $(CFLAGS) -o $@  $^ -lm
 
-EMSCR_ARGS=-O2 -sEXPORTED_RUNTIME_METHODS=ccall,cwrap -sEXPORTED_FUNCTIONS=_compile,_run -sASSERTIONS=1 -sFILESYSTEM=0
+EMSCR_ARGS=-O2 -sEXPORTED_RUNTIME_METHODS=ccall,cwrap -sEXPORTED_FUNCTIONS=_init,_recompile,_get_led -sASSERTIONS=1 -sFILESYSTEM=0
 
 
-lssl.js: lexer.c parser.c vm_defs.c ast.c error.c ast_ops.c codegen.c vm.c vm_syscall.c js_funcs.c led_syscalls.c
+lssl.js: lexer.c parser.c vm_defs.c ast.c error.c ast_ops.c codegen.c vm.c vm_syscall.c js_funcs.c led_syscalls.c vm.c
 	emcc -o $@ $^ $(EMSCR_ARGS) -lm
 
 clean:

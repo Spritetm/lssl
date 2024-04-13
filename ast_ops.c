@@ -49,8 +49,8 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 				exit(1);
 			}
 			if (s->type==AST_TYPE_FUNCDEF) {
-				panic_error(n, "Cannot use function %s in expression! (Forgot the brackets?)", n->name);
-				exit(1);
+				//Change return type to function
+				n->returns=AST_RETURNS_FUNCTION;
 			}
 			n->value=s;
 		} else if (n->type==AST_TYPE_FUNCCALL) {
@@ -81,6 +81,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 					//Change node to reflect.
 					n->type=AST_TYPE_SYSCALL;
 					n->valpos=callno;
+					printf("syscall %d\n", callno);
 				}
 			}
 		}

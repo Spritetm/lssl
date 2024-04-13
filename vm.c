@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdio.h>
 #include <assert.h>
 #include "vm_defs.h"
 #include "vm_syscall.h"
@@ -31,8 +32,8 @@ static uint32_t get_i32(uint8_t *p) {
 
 lssl_vm_t *lssl_vm_init(uint8_t *program, int prog_len, int stack_size_words) {
 	uint32_t ver=get_i32(&program[0]);
-	uint32_t glob_sz=get_i32(&program[0]);
-	uint32_t initial_pc=get_i32(&program[0]);
+	uint32_t glob_sz=get_i32(&program[4]);
+	uint32_t initial_pc=get_i32(&program[8]);
 
 	//version needs to match
 	if (ver!=LSSL_VM_VER) return NULL;
@@ -45,7 +46,6 @@ lssl_vm_t *lssl_vm_init(uint8_t *program, int prog_len, int stack_size_words) {
 	ret->sp=glob_sz;
 	ret->bp=glob_sz;
 	ret->main_fn=initial_pc;
-	
 	return ret;
 error:
 	if (ret) free(ret->stack);
@@ -79,6 +79,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 	push(vm, -1); //fake return address
 	vm->pc=fn_handle;
 	while(vm->error==LSSL_VM_ERR_NONE) {
+		printf("PC %x\n", vm->pc);
 		int op=vm->progmem[vm->pc++];
 		//todo: bounds check
 		int bytes=lssl_vm_argtypes[lssl_vm_ops[op].argtype].byte_size;
@@ -189,6 +190,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			for (int i=0; i<args; i++) argv[args-i-1]=pop(vm);
 			push(vm, vm_syscall(arg, argv, args));
 		} else {
+			printf("Unknown opcode!\n");
 			vm->error=LSSL_VM_ERR_UNK_OP;
 		}
 	}

@@ -13,3 +13,4 @@ void vm_syscall_add_local_syscalls(const vm_syscall_list_entry_t *syscalls, int 
 int32_t vm_syscall(int syscall, int32_t *arg, int argct);
 int vm_syscall_handle_for_name(const char *name);
 int vm_syscall_arg_count(int handle);
+const char *vm_syscall_name(int handle);

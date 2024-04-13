@@ -10,6 +10,9 @@
 					var text = args.join(' ');
 					console.log(text);
 				}),
+				onRuntimeInitialized: (function() {
+					Module.ccall('init', null, [], []);
+				}),
 			};
 		</script>
 		<script type="text/javascript" src="lssl.js"></script>
@@ -26,10 +29,12 @@ function set_led(pos, time){
 }
 
 function main() {
-	set_led_cb(set_led);
+	register_led_cb(set_led);
 }
 		</textarea>
 		<br>
 		<input type="submit" id="compile_btn" value="compile">
+		<canvas id="leds" width="1" height="100" style="width:100%; height: 20px;">
+		</canvas>
 	</body>
 </html>

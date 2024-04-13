@@ -27,8 +27,16 @@ typedef enum {
 	AST_TYPE_MAX //always last item
 } ast_type_en;
 
+typedef enum {
+	AST_RETURNS_UNK=0,
+	AST_RETURNS_CONST,
+	AST_RETURNS_NUMBER,
+	AST_RETURNS_FUNCTION
+} ast_returns_t;
+
 struct ast_node_t {
-	int type;
+	ast_type_en type;
+	ast_returns_t returns;
 	char *name;
 	int32_t numberi;
 	float numberf;

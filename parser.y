@@ -125,6 +125,7 @@ stdaloneexpr: expr {
 funcdef: TOKEN_FUNCTION TOKEN_STR TOKEN_LPAREN funcdefargs TOKEN_RPAREN TOKEN_CURLOPEN input TOKEN_CURLCLOSE {
 		$$=ast_new_node(AST_TYPE_FUNCDEF, &@$);
 		$$->name=strdup($2);
+		$$->returns=AST_RETURNS_NUMBER; //functions can only return a number for now
 		ast_add_child($$, $4);
 		ast_add_child($$, $7);
 	}
@@ -216,14 +217,17 @@ br_term: term
 term: TOKEN_NUMBERI { 
 		$$=ast_new_node(AST_TYPE_INT, &@$);
 		$$->numberi=$1;
+		$$->returns=AST_RETURNS_CONST;
 	 }
 | TOKEN_NUMBERF { 
 		$$=ast_new_node(AST_TYPE_FLOAT, &@$);
 		$$->numberf=$1;
+		$$->returns=AST_RETURNS_CONST;
 	}
 | TOKEN_STR { 
 		$$=ast_new_node(AST_TYPE_VAR, &@$);
 		$$->name=strdup($1);
+		$$->returns=AST_RETURNS_NUMBER;
 	}
 | func_call
 
@@ -232,6 +236,7 @@ func_call: TOKEN_STR TOKEN_LPAREN funccallargs TOKEN_RPAREN {
 		$$=ast_new_node(AST_TYPE_FUNCCALL, &@$);
 		$$->name=strdup($1);
 		ast_add_child($$, $3);
+		$$->returns=AST_RETURNS_NUMBER;
 	}
 
 funccallargs: %empty { $$=NULL; }

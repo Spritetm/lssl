@@ -96,6 +96,17 @@ ast_node_t *ast_new_node_2chld(ast_type_en type, file_loc_t *loc, ast_node_t *c1
 	ast_node_t *r=ast_new_node(type, loc);
 	r->children=c1;
 	c1->sibling=c2;
+	if (c1->returns==AST_RETURNS_CONST && c2->returns==AST_RETURNS_CONST) {
+		r->returns=AST_RETURNS_CONST;
+	} else if (c1->returns==AST_RETURNS_CONST && c2->returns==AST_RETURNS_NUMBER) {
+		r->returns=AST_RETURNS_NUMBER;
+	} else if (c1->returns==AST_RETURNS_NUMBER && c2->returns==AST_RETURNS_CONST) {
+		r->returns=AST_RETURNS_NUMBER;
+	} else if (c1->returns==AST_RETURNS_NUMBER && c2->returns==AST_RETURNS_NUMBER) {
+		r->returns=AST_RETURNS_NUMBER;
+	} else {
+		//ToDo: throw error
+	}
 	return r;
 }
 

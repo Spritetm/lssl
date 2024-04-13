@@ -111,6 +111,12 @@ static vm_syscall_list_entry_t const *ent_for_handle(int handle) {
 	return NULL;
 }
 
+const char *vm_syscall_name(int handle) {
+	const vm_syscall_list_entry_t *ent=ent_for_handle(handle);
+	assert(ent && "Invalid syscall entry!");
+	return ent->name;
+}
+
 int vm_syscall_arg_count(int handle) {
 	const vm_syscall_list_entry_t *ent=ent_for_handle(handle);
 	assert(ent && "Invalid syscall entry!");
@@ -121,5 +127,6 @@ int32_t vm_syscall(int syscall, int32_t *arg, int argct) {
 	const vm_syscall_list_entry_t *ent=ent_for_handle(syscall);
 	assert(ent && "Invalid syscall entry!");
 	assert(ent->argct==argct && "Invalid arg count for syscall!");
+	printf("Syscall %d (%s)\n", syscall, ent->name);
 	return ent->fn(arg, argct);
 }

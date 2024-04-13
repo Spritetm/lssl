@@ -3,6 +3,7 @@
 #include <assert.h>
 #include "ast.h"
 #include "codegen.h"
+#include "error.h"
 
 /*
 Note: This adds instructions to within the AST. This has the downside that 
@@ -147,6 +148,10 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_POP, 1);
 	} else if (n->type==AST_TYPE_ASSIGN) {
+		if (n->children->returns!=AST_RETURNS_NUMBER) {
+			panic_error(n, "Eek! Value assigned to variable isn't a number!");
+			exit(1);
+		}
 		codegen_node(n->children);
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_WR_VAR, 1);
 		i->value=n->value;
@@ -165,9 +170,9 @@ static void codegen_node(ast_node_t *n) {
 		//ignore
 	} else if (n->type==AST_TYPE_SYSCALL) {
 		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_SYSCALL);
-		i->valpos=n->valpos; 
+		i->insn_arg=n->valpos; 
 	} else {
-		printf("Eek! Unknown ast type %d\n", n->type);
+		panic_error(n, "Eek! Unknown ast type %d\n", n->type);
 	}
 }
 
