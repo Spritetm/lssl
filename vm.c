@@ -183,7 +183,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			int32_t a=pop(vm);
 			push(vm, (a>=b));
 		} else if (op==INSN_SYSCALL) {
-			int args=lssl_vm_syscalls[arg].params;
+			int args=vm_syscall_arg_count(arg);
 			assert(args<=8);
 			int32_t argv[8];
 			for (int i=0; i<args; i++) argv[args-i-1]=pop(vm);

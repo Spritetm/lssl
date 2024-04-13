@@ -163,6 +163,9 @@ static void codegen_node(ast_node_t *n) {
 		//na, enter/leave is resolved elsewhere
 	} else if (n->type==AST_TYPE_INSN) {
 		//ignore
+	} else if (n->type==AST_TYPE_SYSCALL) {
+		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_SYSCALL);
+		i->valpos=n->valpos; 
 	} else {
 		printf("Eek! Unknown ast type %d\n", n->type);
 	}

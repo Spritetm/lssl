@@ -4,6 +4,7 @@
 #include <assert.h>
 #include "ast.h"
 #include "error.h"
+#include "vm_syscall.h"
 
 //Mental node: definition of 'fixup' is finding a position (e.g. in ram) for a symbol and changing
 //the instructions to match that.
@@ -53,8 +54,10 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 			}
 			n->value=s;
 		} else if (n->type==AST_TYPE_FUNCCALL) {
-			//Find function symbol and resolve. ToDo: check if
-			//function arg types correspond to declared arg types.
+			//Find function symbol and resolve.
+			int argct=0;
+			for (ast_node_t *i=n->children; i!=NULL; i=i->sibling) argct++;
+
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (s) {
 				if (s->type!=AST_TYPE_FUNCDEF) {
@@ -64,17 +67,18 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 				n->value=s;
 			} else {
 				//Perhaps it's a syscall?
-				int callno=-1;
-				for (int i=0; i<lssl_vm_syscalls_ct; i++) {
-					if (strcmp(lssl_vm_syscalls[i].name, n->name)==0) {
-						callno=i;
-					}
-				}
-				if (callno==-1) {
+				int callno=vm_syscall_handle_for_name(n->name);
+				if (callno<0) {
 					panic_error(n, "Undefined var/function %s", n->name);
 					exit(1);
 				} else {
-					//Yep, syscall. Change parameter.
+					//Yep, syscall. Check if arg count matches.
+					int needed_args=vm_syscall_arg_count(callno);
+					if (argct!=needed_args) {
+						panic_error(n, "Syscall %s requires %d args, %d given", n->name, needed_args, argct);
+						exit(1);
+					}
+					//Change node to reflect.
 					n->type=AST_TYPE_SYSCALL;
 					n->valpos=callno;
 				}

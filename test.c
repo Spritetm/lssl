@@ -5,6 +5,7 @@
 #include "parser.h"
 #include "ast_ops.h"
 #include "codegen.h"
+#include "led_syscalls.h"
 
 int main(int argc, char **argv) {
 	char buf[1024*1024];
@@ -20,6 +21,7 @@ int main(int argc, char **argv) {
 		fclose(f);
 	}
 
+	led_syscalls_init();
 	yyscan_t myscanner;
 	yylex_init(&myscanner);
 //    struct yyguts_t * yyg = (struct yyguts_t*)myscanner;

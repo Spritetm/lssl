@@ -17,10 +17,3 @@ const lssl_vm_argtype_t lssl_vm_argtypes[]={
 };
 #undef LSSL_ARGTYPE_ENTRY
 
-#define LSSL_SYSCALL_ENTRY(name, params) {STRINGIFY(name), params},
-const lssl_vm_syscall_t lssl_vm_syscalls[]={
-	LSSL_SYSCALLS
-};
-#undef LSSL_SYSCALL_ENTRY
-
-const int lssl_vm_syscalls_ct=sizeof(lssl_vm_syscalls)/sizeof(lssl_vm_syscall_t);
