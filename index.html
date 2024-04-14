@@ -12,6 +12,7 @@
 				}),
 				onRuntimeInitialized: (function() {
 					Module.ccall('init', null, [], []);
+					document.querySelector("#compile_btn").disabled=false;
 				}),
 			};
 		</script>
@@ -21,7 +22,7 @@
 	<body>
 		<textarea id="code_text" rows="15" cols="80">
 function set_led(pos, time){
-	var a=pos*0.01+time*0.1;
+	var a=pos*0.1+time*2;
 	var r=sin(a)*127+128;
 	var g=sin(a+2.1)*127+128;
 	var b=sin(a+4.2)*127+128;
@@ -34,7 +35,7 @@ function main() {
 		</textarea>
 		<br>
 		<input type="submit" id="compile_btn" value="compile">
-		<canvas id="leds" width="1" height="100" style="width:100%; height: 20px;">
+		<canvas id="leds" width="100" height="1" style="width:100%; height: 20px;">
 		</canvas>
 	</body>
 </html>

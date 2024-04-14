@@ -46,6 +46,7 @@ const static char *ast_type_str[]={
 	"INST",
 	"RETURN",
 	"SYSCALL",
+	"FUNCPTR",
 };
 
 

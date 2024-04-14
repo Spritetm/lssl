@@ -31,19 +31,7 @@ void recompile(char *code) {
 
 	yyparse(&prognode, myscanner);
 
-	ast_ops_fix_parents(prognode);
-	ast_ops_attach_symbol_defs(prognode);
-	ast_ops_fix_parents(prognode);
-	ast_ops_add_trailing_return(prognode);
-	ast_ops_fix_parents(prognode);
-	ast_ops_var_place(prognode);
-	codegen(prognode);
-	ast_ops_position_insns(prognode);
-	ast_ops_fixup_enter_leave_return(prognode);
-	ast_ops_remove_useless_ops(prognode);
-	ast_ops_assign_addr_to_fndef_node(prognode);
-	ast_ops_fixup_addrs(prognode);
-	ast_dump(prognode);
+	ast_ops_do_compile(prognode);
 
 	int bin_len;
 	program=ast_ops_gen_binary(prognode, &bin_len);
@@ -54,9 +42,15 @@ void recompile(char *code) {
 	lssl_vm_run_main(vm);
 }
 
+uint8_t rgb[3];
 
-void get_led(int pos, float t, uint8_t *rgb) {
+uint8_t *get_led(int pos, float t) {
+	if (!vm) {
+		rgb[0]=0; rgb[1]=0; rgb[2]=128;
+		return rgb;
+	}
 	led_syscalls_calculate_led(vm, pos, t);
 	led_syscalls_get_rgb(&rgb[0], &rgb[1], &rgb[2]);
+	return rgb;
 }
 

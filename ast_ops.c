@@ -5,6 +5,7 @@
 #include "ast.h"
 #include "error.h"
 #include "vm_syscall.h"
+#include "codegen.h"
 
 //Mental node: definition of 'fixup' is finding a position (e.g. in ram) for a symbol and changing
 //the instructions to match that.
@@ -49,7 +50,9 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 				exit(1);
 			}
 			if (s->type==AST_TYPE_FUNCDEF) {
-				//Change return type to function
+				printf("%s is funcdef\n", n->name);
+				//Change node type to function
+				n->type=AST_TYPE_FUNCPTR;
 				n->returns=AST_RETURNS_FUNCTION;
 			}
 			n->value=s;
@@ -150,7 +153,7 @@ static void function_number_arguments(ast_node_t *node) {
 	//Find out arg count.
 	int arg_size=arg_size_for_fn(node);
 	//Number args
-	int i=-2-(arg_size-1);
+	int i=-3-(arg_size-1);
 	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEFARG) {
 			n->valpos=i++;
@@ -164,10 +167,10 @@ static void function_number_arguments(ast_node_t *node) {
 //of stack space this block needs.
 static int block_place_locals(ast_node_t * node, int start_pos) {
 	//Give position to local vars. Also adds size of locals (but not subblocks) to `pos`.
-	int pos=start_pos;
+	int pos=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_DECLARE) {
-			n->valpos=pos++;
+			n->valpos=start_pos+pos++;
 		}
 	}
 	
@@ -175,7 +178,7 @@ static int block_place_locals(ast_node_t * node, int start_pos) {
 	int subblk_max_size=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->children) {
-			int s=block_place_locals(n->children, pos);
+			int s=block_place_locals(n->children, pos+start_pos);
 			if (subblk_max_size<s) subblk_max_size=s;
 		}
 	}
@@ -185,7 +188,6 @@ static int block_place_locals(ast_node_t * node, int start_pos) {
 //Figure out and set the offsets of variables and func args
 //Returns size of globals.
 void ast_ops_var_place(ast_node_t *node) {
-
 	//Number arguments
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEF) {
@@ -255,7 +257,7 @@ void fixup_enter_leave_return(ast_node_t *node, int arg_size, int localsize) {
 }
 
 
-//Fixes up these instructions
+//Fixes up enter/leave/return instructions
 void ast_ops_fixup_enter_leave_return(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEF) {
@@ -402,4 +404,21 @@ uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 	gen_binary(node, &p);
 	*len=p.len;
 	return p.data;
+}
+
+//Calls all ops (except binary generation) in the proper order
+void ast_ops_do_compile(ast_node_t *prognode) {
+	ast_ops_fix_parents(prognode);
+	ast_ops_attach_symbol_defs(prognode);
+	ast_ops_fix_parents(prognode);
+	ast_ops_add_trailing_return(prognode);
+	ast_ops_fix_parents(prognode);
+	ast_ops_var_place(prognode);
+	codegen(prognode);
+	ast_ops_position_insns(prognode);
+	ast_ops_fixup_enter_leave_return(prognode);
+	ast_ops_remove_useless_ops(prognode);
+	ast_ops_assign_addr_to_fndef_node(prognode);
+	ast_ops_fixup_addrs(prognode);
+	ast_dump(prognode);
 }

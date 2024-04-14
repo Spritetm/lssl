@@ -11,6 +11,7 @@ void ast_ops_remove_useless_ops(ast_node_t *node);
 void ast_ops_position_insns(ast_node_t *node);
 void ast_ops_fix_parents(ast_node_t *node);
 
+void ast_ops_do_compile(ast_node_t *prognode);
 
 uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len);
 

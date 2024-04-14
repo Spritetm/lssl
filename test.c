@@ -24,26 +24,13 @@ int main(int argc, char **argv) {
 	led_syscalls_init();
 	yyscan_t myscanner;
 	yylex_init(&myscanner);
-//    struct yyguts_t * yyg = (struct yyguts_t*)myscanner;
     yy_scan_string(buf, myscanner);
 
 	ast_node_t *prognode;
 
 	yyparse(&prognode, myscanner);
 
-	ast_ops_fix_parents(prognode);
-	ast_ops_attach_symbol_defs(prognode);
-	ast_ops_fix_parents(prognode);
-	ast_ops_add_trailing_return(prognode);
-	ast_ops_fix_parents(prognode);
-	ast_ops_var_place(prognode);
-	codegen(prognode);
-	ast_ops_remove_useless_ops(prognode);
-	ast_ops_position_insns(prognode);
-	ast_ops_fixup_enter_leave_return(prognode);
-	ast_ops_assign_addr_to_fndef_node(prognode);
-	ast_ops_fixup_addrs(prognode);
-	ast_dump(prognode);
+	ast_ops_do_compile(prognode);
 
 	if (argc>=3) {
 		int len;

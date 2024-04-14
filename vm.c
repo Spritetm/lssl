@@ -3,30 +3,29 @@
 #include <assert.h>
 #include "vm_defs.h"
 #include "vm_syscall.h"
+#include "vm.h"
 
-#define LSSL_VM_ERR_NONE 0
-#define LSSL_VM_ERR_STACK_OVF 1
-#define LSSL_VM_ERR_STACK_UDF 2
-#define LSSL_VM_ERR_UNK_OP 3
-
-typedef struct {
+struct lssl_vm_t {
 	uint8_t *progmem;
 	int proglen;
-	uint32_t *stack;
+	int32_t *stack;
 	int stack_size;
 	int main_fn;
 	int bp;
 	int sp;
 	int pc;
 	int error;
-} lssl_vm_t;
+};
 
+static int8_t get_i8(uint8_t *p) {
+	return p[0];
+}
 
-static uint16_t get_i16(uint8_t *p) {
+static int16_t get_i16(uint8_t *p) {
 	return p[0]|(p[1]<<8);
 }
 
-static uint32_t get_i32(uint8_t *p) {
+static int32_t get_i32(uint8_t *p) {
 	return p[0]|(p[1]<<8)|(p[2]<<16)|(p[3]<<24);
 }
 
@@ -41,6 +40,7 @@ lssl_vm_t *lssl_vm_init(uint8_t *program, int prog_len, int stack_size_words) {
 	lssl_vm_t *ret=calloc(sizeof(lssl_vm_t), 1);
 	if (!ret) goto error;
 
+	ret->progmem=&program[12];
 	ret->stack_size=stack_size_words;
 	ret->stack=calloc(stack_size_words, sizeof(uint32_t));
 	ret->sp=glob_sz;
@@ -52,6 +52,11 @@ error:
 	free(ret);
 	return NULL;
 }
+
+
+//static void dump_stack(lssl_vm_t *vm) {
+//	for (int i=0; i<vm->sp; i++) printf("%02X (% 3d) %x\n", i, i-vm->sp, vm->stack[i]);
+//}
 
 
 static void push(lssl_vm_t *vm, int32_t val) {
@@ -70,7 +75,7 @@ static int32_t pop(lssl_vm_t *vm) {
 	return vm->stack[--vm->sp];
 }
 
-int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_t *argv, int *error) {
+int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_t *argv, vm_error_en *error) {
 	int32_t ret=0;
 	//push the arguments
 	for (int i=0; i<argc; i++) push(vm, argv[i]);
@@ -78,14 +83,16 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 	push(vm, vm->bp);
 	push(vm, -1); //fake return address
 	vm->pc=fn_handle;
+	vm->bp=vm->sp;
+	vm->error=0;
 	while(vm->error==LSSL_VM_ERR_NONE) {
-		printf("PC %x\n", vm->pc);
 		int op=vm->progmem[vm->pc++];
 		//todo: bounds check
 		int bytes=lssl_vm_argtypes[lssl_vm_ops[op].argtype].byte_size;
 		int arg=0;
 		if (bytes==2) {
-			arg=vm->progmem[vm->pc++];
+			arg=get_i8(&vm->progmem[vm->pc]);
+			vm->pc+=1;
 		} else if (bytes==3) {
 			arg=get_i16(&vm->progmem[vm->pc]);
 			vm->pc+=2;
@@ -190,7 +197,6 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			for (int i=0; i<args; i++) argv[args-i-1]=pop(vm);
 			push(vm, vm_syscall(arg, argv, args));
 		} else {
-			printf("Unknown opcode!\n");
 			vm->error=LSSL_VM_ERR_UNK_OP;
 		}
 	}
@@ -200,7 +206,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 
 
 void lssl_vm_run_main(lssl_vm_t *vm) {
-	int error=0;
+	vm_error_en error=0;
 	lssl_vm_run_function(vm, vm->main_fn, 0, NULL, &error);
 }
 

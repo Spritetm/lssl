@@ -29,13 +29,14 @@ void led_syscalls_init() {
 }
 
 void led_syscalls_calculate_led(lssl_vm_t *vm, int32_t led, float time) {
-	int error=0;
+	vm_error_en error=0;
 	int32_t args[2]={led<<16, (time*65536)};
 	lssl_vm_run_function(vm, led_cb_handle, 2, args, &error);
+	if (error) printf("calculate_led vm error %s\n", vm_err_to_str(error));
 }
 
 void led_syscalls_get_rgb(uint8_t *r, uint8_t *g, uint8_t *b) {
 	*r=cur_led_col[0]>>16;
-	*g=cur_led_col[0]>>16;
-	*b=cur_led_col[0]>>16;
+	*g=cur_led_col[1]>>16;
+	*b=cur_led_col[2]>>16;
 }
