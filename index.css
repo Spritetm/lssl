@@ -1,0 +1,38 @@
+
+#code_text > .oper {
+	color: rgb(0,0,128);
+}
+
+#code_text > .langfunc {
+	color: rgb(128,128,0);
+}
+
+#code_text > .number {
+	color: rgb(0,128,0);
+}
+
+#code_text > .punctuation {
+	color: rgb(64,64,0);
+}
+
+#code_text > .comment {
+	color: rgb(128,128,128);
+}
+
+#code_text > .compile_error {
+	text-decoration: underline wavy red;
+}
+
+.compile_error:before {
+	content: attr(data-error);
+	position: absolute;
+	display: none;
+	background:#FFFF80;
+	border: 1px solid black;
+	margin-top: 1em;
+	margin-left: 1em;
+}
+
+.compile_error:hover:before {
+	display:block;
+}

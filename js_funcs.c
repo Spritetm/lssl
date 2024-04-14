@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <emscripten.h>
+#include <stdarg.h>
 #include "lexer.h"
 #include "lexer_gen.h"
 #include "parser.h"
@@ -14,7 +16,6 @@ static uint8_t *program;
 void init() {
 	led_syscalls_init();
 }
-
 
 void recompile(char *code) {
 	if (vm) {
@@ -120,6 +121,40 @@ token_t *tokenize_for_syntax_hl(char *code) {
 	yylex_destroy(myscanner);
 
 	return tokens;
+}
+
+
+/*
+Note: the following functions replace those in error.c (which is not compiled in for
+the emscripten build) to report errors back to the webpage.
+*/
+
+EM_JS(void, call_report_error, (int pos_start, int pos_end, char* msg), {
+	var umsg=UTF8ToString(msg);
+	report_error(pos_start, pos_end, umsg);
+});
+
+void panic_error(ast_node_t *node, const char *fmt, ...) {
+//	ast_node_t *p=node;
+//	while (p->parent) p=p->parent;
+//	ast_dump(p);
+	char *msg;
+	va_list ap;
+	va_start(ap, fmt);
+	vasprintf(&msg, fmt, ap);
+	va_end(ap);
+	call_report_error(node->loc.pos_start, node->loc.pos_end, msg);
+	free(msg);
+}
+
+void yyerror (const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, const char *fmt, ...) {
+	char *msg;
+	va_list ap;
+	va_start(ap, fmt);
+	vasprintf(&msg, fmt, ap);
+	va_end(ap);
+	call_report_error(loc->pos_start, loc->pos_end, msg);
+	free(msg);
 }
 
 

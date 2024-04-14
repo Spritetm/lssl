@@ -329,7 +329,7 @@ int insn_buf_fixup(insn_buf_t *buf) {
 		if (v->type==SYM_TYPE_FUNCTION) {
 			if (v->target == NULL) {
 				printf("Error! Undefined variable %s\n", v->name);
-				exit(1);
+				return 0;;
 			}
 			v->offset=v->target->pos;
 		}
@@ -480,17 +480,4 @@ void insn_buf_new_src_pos(insn_buf_t *buf) {
 	buf->src_pos=pos;
 	buf->src_pos_stack=pos;
 }
-
-
-/*
-What do I need to export?
-*** Needed ***
-- Version. Specifically if we're gonna do an enum for syscalls
-- Code. Duh.
-*** Debug info ***
-
-*/
-
-
-
 

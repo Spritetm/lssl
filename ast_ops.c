@@ -47,7 +47,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (!s) {
 				panic_error(n, "Undefined var/function %s", n->name);
-				exit(1);
+				return;
 			}
 			if (s->type==AST_TYPE_FUNCDEF) {
 				printf("%s is funcdef\n", n->name);
@@ -65,7 +65,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 			if (s) {
 				if (s->type!=AST_TYPE_FUNCDEF) {
 					panic_error(n, "Cannot call non-function %s", n->name);
-					exit(1);
+					return;
 				}
 				n->value=s;
 			} else {
@@ -73,13 +73,13 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 				int callno=vm_syscall_handle_for_name(n->name);
 				if (callno<0) {
 					panic_error(n, "Undefined var/function %s", n->name);
-					exit(1);
+					return;
 				} else {
 					//Yep, syscall. Check if arg count matches.
 					int needed_args=vm_syscall_arg_count(callno);
 					if (argct!=needed_args) {
 						panic_error(n, "Syscall %s requires %d args, %d given", n->name, needed_args, argct);
-						exit(1);
+						return;
 					}
 					//Change node to reflect.
 					n->type=AST_TYPE_SYSCALL;

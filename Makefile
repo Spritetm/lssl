@@ -19,7 +19,7 @@ vm: vm_defs.o vm.o vm_syscall.o vm_runner.o led_syscalls.o
 EMSCR_ARGS=-O2 -sEXPORTED_RUNTIME_METHODS=ccall,cwrap -sEXPORTED_FUNCTIONS=_init,_recompile,_get_led,_tokenize_for_syntax_hl,_free -sASSERTIONS=1 -sFILESYSTEM=0
 
 
-lssl.js: lexer.c parser.c vm_defs.c ast.c error.c ast_ops.c codegen.c vm.c vm_syscall.c js_funcs.c led_syscalls.c vm.c
+lssl.js: lexer.c parser.c vm_defs.c ast.c ast_ops.c codegen.c vm.c vm_syscall.c js_funcs.c led_syscalls.c vm.c
 	emcc -o $@ $^ $(EMSCR_ARGS) -lm
 
 clean:

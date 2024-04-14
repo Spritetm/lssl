@@ -164,7 +164,7 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_ASSIGN) {
 		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
 			panic_error(n, "Eek! Value assigned to variable isn't a number!");
-			exit(1);
+			return;
 		}
 		codegen_node(n->children);
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_WR_VAR, 1);
