@@ -50,7 +50,6 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 				return;
 			}
 			if (s->type==AST_TYPE_FUNCDEF) {
-				printf("%s is funcdef\n", n->name);
 				//Change node type to function
 				n->type=AST_TYPE_FUNCPTR;
 				n->returns=AST_RETURNS_FUNCTION;

@@ -27,10 +27,10 @@ void recompile(char *code) {
 	yylex_init(&myscanner);
 	yy_scan_string(code, myscanner);
 
-	ast_node_t *prognode;
+	ast_node_t *prognode=NULL;
 
 	yyparse(&prognode, myscanner);
-
+	if (prognode==NULL) return;
 	ast_ops_do_compile(prognode);
 
 	int bin_len;
@@ -144,6 +144,7 @@ void panic_error(ast_node_t *node, const char *fmt, ...) {
 	vasprintf(&msg, fmt, ap);
 	va_end(ap);
 	call_report_error(node->loc.pos_start, node->loc.pos_end, msg);
+	printf("error at %d-%d: %s\n", node->loc.pos_start, node->loc.pos_end, msg);
 	free(msg);
 }
 
@@ -154,6 +155,7 @@ void yyerror (const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, cons
 	vasprintf(&msg, fmt, ap);
 	va_end(ap);
 	call_report_error(loc->pos_start, loc->pos_end, msg);
+	printf("error at %d-%d: %s\n", loc->pos_start, loc->pos_end, msg);
 	free(msg);
 }
 

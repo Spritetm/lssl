@@ -53,6 +53,14 @@ const static char *ast_type_str[]={
 //Dumps a node plus its children. Note: NOT its siblings.
 static void dump_node(ast_node_t *node, int depth) {
 	static_assert(sizeof(ast_type_str)/sizeof(ast_type_str[0])==AST_TYPE_MAX, "ast type desync");
+	if (node==NULL) {
+		printf("dump_node: NULL node passed\n");
+		return;
+	}
+	if (node->type<0 || node->type>=AST_TYPE_MAX) {
+		printf("dump_node: unknown node type %d\n", node->type);
+		return;
+	}
 	printf(" ");
 	for (int i=0; i<depth; i++) printf("|");
 	if (node==NULL) {
@@ -78,6 +86,10 @@ static void dump_node(ast_node_t *node, int depth) {
 }
 
 void ast_dump(ast_node_t *node) {
+	if (node==NULL) {
+		printf("ast_dump: NULL node passed\n");
+		return;
+	}
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		dump_node(n, 0);
 	}
