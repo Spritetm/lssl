@@ -100,13 +100,21 @@ void ast_ops_add_trailing_return(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEF) {
 			ast_node_t *last=n->children;
-			assert(last);
-			while (last->sibling) last=last->sibling;
-			if (last->type!=AST_TYPE_RETURN) {
+			if (last) {
+				//Function is not empty. Find last AST node.
+				while (last->sibling) last=last->sibling;
+				if (last->type!=AST_TYPE_RETURN) {
+					//Add 'return 0'
+					ast_node_t *r=ast_new_node(AST_TYPE_RETURN, &n->loc);
+					//Note '0' is implicit as numberi member of node is zero-initialized.
+					ast_add_child(r, ast_new_node(AST_TYPE_INT, &n->loc));
+					ast_add_sibling(last, r);
+				}
+			} else {
+				//Empty function. Make 'return 0' the content.
 				ast_node_t *r=ast_new_node(AST_TYPE_RETURN, &n->loc);
-				ast_add_sibling(last, r);
-				//defaults to an int with value 0
 				ast_add_child(r, ast_new_node(AST_TYPE_INT, &n->loc));
+				n->children=r;
 			}
 		}
 	}

@@ -8,7 +8,7 @@
 #include "led_syscalls.h"
 
 int main(int argc, char **argv) {
-	char buf[1024*1024];
+	char buf[1024*1024]={};
 	if (argc==1) {
 		fread(buf, sizeof(buf), 1, stdin);
 	} else {

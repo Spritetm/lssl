@@ -1,5 +1,7 @@
 "use strict"
 var led_time=0;
+var compile_timeout=null;
+var led_timer=null;
 
 window.addEventListener("load", (event) => {
 	const code = document.querySelector("#code_text");
@@ -9,11 +11,18 @@ window.addEventListener("load", (event) => {
 
 
 function get_pos_for(node, s_node, s_off) {
-	var sel=document.getSelection().getRangeAt(0);
+	if (s_node.nodeType==Node.ELEMENT_NODE) {
+		//Note: In this case s_off is the nth child element of
+		//s_node, not the text position within s_node.
+		//Figure out that child and call the function with an offset
+		//of 0 there to get the correct result.
+		return get_pos_for(node, s_node.childNodes[s_off], 0);
+	}
+
 	if (node==s_node) {
 		return [true, s_off];
 	}
-	if (node.nodeType==3) { //text node
+	if (node.nodeType==Node.TEXT_NODE) { //text node
 		return [false, node.textContent.length];
 	} else {
 		var off=0;
@@ -29,14 +38,20 @@ function get_pos_for(node, s_node, s_off) {
 	}
 }
 
-
+function get_sel_pos(container) {
+	if (document.getSelection().rangeCount<1) return [0, 0];
+	var sel=document.getSelection().getRangeAt(0);
+	var [f, soff]=get_pos_for(container, sel.startContainer, sel.startOffset);
+	var [f, eoff]=get_pos_for(container, sel.endContainer, sel.endOffset);
+	return [soff, eoff];
+}
 
 //Returns a [node, offset in the node] for a certain offset into a [grand]parent node
 function sel_pos_to_node_off(node, off) {
 	var len=0;
 	for (const n of node.childNodes) {
 		if (n.nodeType==Node.TEXT_NODE) { //text node
-			if (off<n.textContent.length) {
+			if (off<=n.textContent.length) {
 				//Found the node.
 				return [n, off];
 			} else {
@@ -62,17 +77,6 @@ function set_sel_to(node, off) {
 	document.getSelection().removeAllRanges();
 	document.getSelection().addRange(sel);
 }
-
-function get_sel_pos(container) {
-	if (document.getSelection().rangeCount<1) return [0, 0];
-	var sel=document.getSelection().getRangeAt(0);
-	var [f, soff]=get_pos_for(container, sel.startContainer, sel.startOffset);
-	var [f, eoff]=get_pos_for(container, sel.endContainer, sel.endOffset);
-	return [soff, eoff];
-}
-
-var compile_timeout=null;
-var led_timer=null;
 
 function code_keypress(e) {
 	const code = document.querySelector("#code_text");
@@ -113,13 +117,16 @@ function recompile_typed() {
 	if (compile_errors.length==0) {
 		//Start running VM
 		if (led_timer===null) {
+			console.log("Compile succesful. Restarting VM");
 			led_timer=setInterval(led_tick, 20);
 		}
 	} else {
 		//Stop running VM
 		if (led_timer!==null) {
+			console.log("Compile has errors. Stopping VM");
 			clearInterval(led_timer);
-			led_tick=0;
+			led_timer=null;
+			led_time=0;
 		}
 	}
 
