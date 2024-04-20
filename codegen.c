@@ -92,12 +92,14 @@ void handle_rhs_lhs_op(ast_node_t *node, lssl_instr_enum type) {
 }
 
 static void codegen_node(ast_node_t *n) {
-	if (n->type==AST_TYPE_INT) {
-		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_PUSH_I);
-		i->insn_arg=n->numberi;
-	} else if (n->type==AST_TYPE_FLOAT) {
-		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_PUSH_R);
-		i->insn_arg=(n->numberf*65536);
+	if (n->type==AST_TYPE_NUMBER) {
+		if ((n->number&0xffff)==0) {
+			ast_node_t *i=insert_insn_before_arg_eval(n, INSN_PUSH_I);
+			i->insn_arg=n->number>>16;
+		} else {
+			ast_node_t *i=insert_insn_before_arg_eval(n, INSN_PUSH_R);
+			i->insn_arg=n->number;
+		}
 	} else if (n->type==AST_TYPE_PLUS) {
 		handle_rhs_lhs_op(n, INSN_ADD);
 	} else if (n->type==AST_TYPE_MINUS) {
@@ -167,10 +169,21 @@ static void codegen_node(ast_node_t *n) {
 			return;
 		}
 		codegen_node(n->children);
-		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_WR_VAR, 1);
+		ast_node_t *i;
+		if (n->value->parent==NULL) {
+			//global var
+			i=insert_insn_after_arg_eval(n, INSN_WR_G_VAR, 1);
+		} else {
+			i=insert_insn_after_arg_eval(n, INSN_WR_VAR, 1);
+		}
 		i->value=n->value;
 	} else if (n->type==AST_TYPE_VAR) {
-		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_RD_VAR);
+		ast_node_t *i;
+		if (n->value->parent==NULL) {
+			i=insert_insn_before_arg_eval(n, INSN_RD_G_VAR);
+		} else {
+			i=insert_insn_before_arg_eval(n, INSN_RD_VAR);
+		}
 		i->value=n->value;
 	} else if (n->type==AST_TYPE_RETURN) {
 		codegen_node(nth_param(n, 1));

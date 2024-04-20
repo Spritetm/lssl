@@ -40,10 +40,11 @@ while (0)
 %token TOKEN_COMMA
 %token TOKEN_PERIOD
 %token TOKEN_ASSIGN
-%token TOKEN_NUMBERF TOKEN_NUMBERI
+%token TOKEN_NUMBER
 %token TOKEN_VAR
 %token TOKEN_STR
 %token TOKEN_CURLOPEN TOKEN_CURLCLOSE
+%token TOKEN_SQBOPEN TOKEN_SQBCLOSE
 %token TOKEN_FOR TOKEN_WHILE TOKEN_IF
 %token TOKEN_FUNCTION
 %token TOKEN_EQ TOKEN_NEQ TOKEN_L TOKEN_G TOKEN_LEQ TOKEN_GEQ
@@ -56,14 +57,12 @@ while (0)
 %define api.location.type {file_loc_t}
 
 %union{
-	int numberi;
-	float numberf;
+	int number;
 	char *str;
 	ast_node_t *ast;
 }
 
-%type<numberi> TOKEN_NUMBERI
-%type<numberf> TOKEN_NUMBERF
+%type<number> TOKEN_NUMBER
 %type<str> TOKEN_STR
 %type<ast> input input_line statement block funcdef stdaloneexpr
 %type<ast> funcdefargs while_statement if_statement for_statement assignment
@@ -167,25 +166,45 @@ assignment: TOKEN_STR TOKEN_ASSIGN expr {
 		$$->name=strdup($1);
 		ast_add_child($$, $3);
 	}
+| TOKEN_STR TOKEN_SQBOPEN expr TOKEN_SQBCLOSE TOKEN_ASSIGN expr {
+		$$=ast_new_node(AST_TYPE_ASSIGN_ARRAY_MEMBER, &@$);
+		$$->name=strdup($1);
+		ast_add_child($$, $3);
+		ast_add_child($$, $6);
+}
 
 vardef: TOKEN_VAR TOKEN_STR {
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
+		$$->size=1;
 		$$->name=strdup($2);
+		$$->returns=AST_RETURNS_NUMBER;
 	}
 | TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->name=strdup($2);
+		$$->size=1;
 
 		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN, &@$);
 		a->name=strdup($2);
+		a->returns=$4->returns;
 		ast_add_sibling($$, a);
 		ast_add_child(a, $4);
 	}
+| TOKEN_VAR TOKEN_STR TOKEN_SQBOPEN expr TOKEN_SQBCLOSE {
+		if ($4->returns!=AST_RETURNS_CONST) {
+			yyerror(&@$, program, scanner, "Array size cannot be variable");
+			YYERROR;
+		}
+		$$=ast_new_node(AST_TYPE_DECLARE_ARRAY, &@$);
+		$$->name=strdup($2);
+		ast_add_child($$, $4);
+		$$->returns=AST_RETURNS_ARRAY;
+}
 
 return_statement: TOKEN_RETURN {
 		$$=ast_new_node(AST_TYPE_RETURN, &@$);
-		ast_node_t *a=ast_new_node(AST_TYPE_INT, &@$);
-		a->numberi=0;
+		ast_node_t *a=ast_new_node(AST_TYPE_NUMBER, &@$);
+		a->number=0;
 		ast_add_child($$, a);
 }
 | TOKEN_RETURN expr {
@@ -214,15 +233,15 @@ br_term: term
 		$$=$2;
 	}
 
-term: TOKEN_NUMBERI { 
-		$$=ast_new_node(AST_TYPE_INT, &@$);
-		$$->numberi=$1;
+term: TOKEN_NUMBER { 
+		$$=ast_new_node(AST_TYPE_NUMBER, &@$);
+		$$->number=$1;
 		$$->returns=AST_RETURNS_CONST;
 	 }
-| TOKEN_NUMBERF { 
-		$$=ast_new_node(AST_TYPE_FLOAT, &@$);
-		$$->numberf=$1;
-		$$->returns=AST_RETURNS_CONST;
+| TOKEN_STR TOKEN_SQBOPEN expr TOKEN_SQBCLOSE {
+		$$=ast_new_node(AST_TYPE_ARRAY_DEREF, &@$);
+		ast_add_child($$, $3);
+		$$->returns=AST_RETURNS_NUMBER;
 	}
 | TOKEN_STR { 
 		$$=ast_new_node(AST_TYPE_VAR, &@$);

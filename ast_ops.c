@@ -11,6 +11,56 @@
 //the instructions to match that.
 
 
+//This collates const values, e.g. '(2+4)/3)' gets collated into a single const number '2'.
+static void ast_ops_collate_consts_node(ast_node_t *node) {
+	//We can only collate things that only have child members that are also CONST.
+	int all_const=1;
+	int32_t arg[16];
+	int argct=0;
+	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
+		ast_ops_collate_consts_node(n);
+		if (n->returns!=AST_RETURNS_CONST) all_const=0;
+		if (argct<16) arg[argct++]=n->number;
+	}
+	if (all_const) {
+		int collate_ok=1;
+		if (node->type==AST_TYPE_PLUS && argct==2) {
+			node->number=arg[0]+arg[1];
+		} else if (node->type==AST_TYPE_MINUS && argct==2) {
+			node->number=arg[0]-arg[1];
+		} else if (node->type==AST_TYPE_TIMES && argct==2) {
+			int64_t v=arg[0]*arg[1];
+			node->number=v>>16;
+		} else if (node->type==AST_TYPE_DIVIDE && argct==2) {
+			node->number=(arg[0]*65536.0)/arg[1];
+		} else {
+			collate_ok=0;
+		}
+		if (collate_ok) {
+			node->type=AST_TYPE_NUMBER;
+			node->children=NULL; //ToDo: free nodes?
+		}
+	}
+}
+
+void ast_ops_collate_consts(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		ast_ops_collate_consts_node(n);
+	}
+}
+
+//Convert DECLARE_ARRAY into DECLARE with set size
+void ast_ops_convert_declare_array(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->children) ast_ops_convert_declare_array(n->children);
+		if (n->type==AST_TYPE_DECLARE_ARRAY) {
+			n->type=AST_TYPE_DECLARE;
+			n->size=(n->children->number)>>16;
+			n->children=n->children->sibling; //remove size node
+		}
+	}
+}
+
 typedef struct {
 	ast_node_t **nodes;
 	int node_pos;
@@ -106,14 +156,14 @@ void ast_ops_add_trailing_return(ast_node_t *node) {
 				if (last->type!=AST_TYPE_RETURN) {
 					//Add 'return 0'
 					ast_node_t *r=ast_new_node(AST_TYPE_RETURN, &n->loc);
-					//Note '0' is implicit as numberi member of node is zero-initialized.
-					ast_add_child(r, ast_new_node(AST_TYPE_INT, &n->loc));
+					//Note '0' is implicit as number member of node is zero-initialized.
+					ast_add_child(r, ast_new_node(AST_TYPE_NUMBER, &n->loc));
 					ast_add_sibling(last, r);
 				}
 			} else {
 				//Empty function. Make 'return 0' the content.
 				ast_node_t *r=ast_new_node(AST_TYPE_RETURN, &n->loc);
-				ast_add_child(r, ast_new_node(AST_TYPE_INT, &n->loc));
+				ast_add_child(r, ast_new_node(AST_TYPE_NUMBER, &n->loc));
 				n->children=r;
 			}
 		}
@@ -177,7 +227,8 @@ static int block_place_locals(ast_node_t * node, int start_pos) {
 	int pos=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_DECLARE) {
-			n->valpos=start_pos+pos++;
+			n->valpos=start_pos+pos;
+			pos+=n->size;
 		}
 	}
 	
@@ -193,12 +244,20 @@ static int block_place_locals(ast_node_t * node, int start_pos) {
 }
 
 //Figure out and set the offsets of variables and func args
-//Returns size of globals.
 void ast_ops_var_place(ast_node_t *node) {
 	//Number arguments
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEF) {
 			function_number_arguments(n);
+		}
+	}
+	
+	int glob_pos=0;
+	//Find globals
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_DECLARE) {
+			n->valpos=glob_pos;
+			glob_pos+=n->size;
 		}
 	}
 	
@@ -208,7 +267,7 @@ void ast_ops_var_place(ast_node_t *node) {
 			int stack_space_locals=block_place_locals(n->children, 0);
 			//Make and insert node so we can resolve this to an ENTER instruction
 			ast_node_t *d=ast_new_node(AST_TYPE_LOCALSIZE, &node->loc);
-			d->numberi=stack_space_locals;
+			d->number=stack_space_locals;
 			d->sibling=n->children;
 			n->children=d;
 		}
@@ -271,7 +330,7 @@ void ast_ops_fixup_enter_leave_return(ast_node_t *node) {
 			int arg_size=arg_size_for_fn(n);
 			ast_node_t *ls=n->children;
 			while (ls && ls->type!=AST_TYPE_LOCALSIZE) ls=ls->sibling;
-			int localsize=ls->numberi;
+			int localsize=ls->number;
 			fixup_enter_leave_return(n, arg_size, localsize);
 		}
 	}
@@ -383,8 +442,7 @@ static int globals_size(ast_node_t *node) {
 	int glob_size=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_DECLARE) {
-			n->valpos=glob_size;
-			glob_size++;
+			glob_size+=n->size;
 		}
 	}
 	return glob_size;
@@ -396,7 +454,7 @@ static int initial_pc(ast_node_t *node, const char *main_fn_name) {
 			return n->valpos;
 		}
 	}
-	printf("Warning: no main function %s found. Using first function defined instead.\n", main_fn_name);
+	printf("Warning: no function '%s' found. Using first function defined instead.\n", main_fn_name);
 	return 0;
 }
 
@@ -416,6 +474,8 @@ uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 //Calls all ops (except binary generation) in the proper order
 void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_fix_parents(prognode);
+	ast_ops_collate_consts(prognode);
+	ast_ops_convert_declare_array(prognode);
 	ast_ops_attach_symbol_defs(prognode);
 	ast_ops_fix_parents(prognode);
 	ast_ops_add_trailing_return(prognode);

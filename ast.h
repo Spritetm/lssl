@@ -6,8 +6,7 @@
 typedef struct ast_node_t ast_node_t;
 
 typedef enum {
-	AST_TYPE_INT=0,
-	AST_TYPE_FLOAT,
+	AST_TYPE_NUMBER=0,
 	AST_TYPE_PLUS, AST_TYPE_MINUS, AST_TYPE_TIMES, AST_TYPE_DIVIDE,
 	AST_TYPE_FOR, AST_TYPE_IF, AST_TYPE_WHILE,
 	AST_TYPE_TEQ, AST_TYPE_TNEQ, AST_TYPE_TL, AST_TYPE_TLEQ,
@@ -19,12 +18,14 @@ typedef enum {
 	AST_TYPE_DROP,
 	AST_TYPE_ASSIGN,
 	AST_TYPE_VAR,
-	AST_TYPE_DECLARE,
+	AST_TYPE_DECLARE, AST_TYPE_DECLARE_ARRAY,
 	AST_TYPE_LOCALSIZE,
 	AST_TYPE_INSN,
 	AST_TYPE_RETURN,
 	AST_TYPE_SYSCALL,
 	AST_TYPE_FUNCPTR,
+	AST_TYPE_ARRAY_DEREF,
+	AST_TYPE_ASSIGN_ARRAY_MEMBER,
 	AST_TYPE_MAX //always last item
 } ast_type_en;
 
@@ -32,6 +33,7 @@ typedef enum {
 	AST_RETURNS_UNK=0,
 	AST_RETURNS_CONST,
 	AST_RETURNS_NUMBER,
+	AST_RETURNS_ARRAY,
 	AST_RETURNS_FUNCTION
 } ast_returns_t;
 
@@ -39,8 +41,8 @@ struct ast_node_t {
 	ast_type_en type;
 	ast_returns_t returns;
 	char *name;
-	int32_t numberi;
-	float numberf;
+	int32_t number;
+	int size;
 	char *str;
 	file_loc_t loc;
 	ast_node_t *value; //e.g. the node for a var def in case of a var ref, of func def for func ref

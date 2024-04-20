@@ -54,9 +54,11 @@ hexdigit	[0-9A-Fa-f]
 ">="					{ return TOKEN_GEQ;		}
 "{"						{ return TOKEN_CURLOPEN;	}
 "}"						{ return TOKEN_CURLCLOSE;	}
-{digit}+"."{digit}+		{ (yylval)->numberf=strtof(yytext, NULL); return TOKEN_NUMBERF; }
-"0x"{hexdigit}+			{ (yylval)->numberi=strtol(yytext, NULL, 16); return TOKEN_NUMBERI; }
-{digit}+			 	{ (yylval)->numberi=strtol(yytext, NULL, 10); return TOKEN_NUMBERI; }
+"["						{ return TOKEN_SQBOPEN;		}
+"]"						{ return TOKEN_SQBCLOSE;	}
+{digit}+"."{digit}+		{ (yylval)->number=strtof(yytext, NULL)*65536.0; return TOKEN_NUMBER; }
+"0x"{hexdigit}+			{ (yylval)->number=strtol(yytext, NULL, 16)<<16; return TOKEN_NUMBER; }
+{digit}+			 	{ (yylval)->number=strtol(yytext, NULL, 10)<<16; return TOKEN_NUMBER; }
 "var"				 	{ return TOKEN_VAR;		}
 "for"					{ return TOKEN_FOR;		}
 "while"					{ return TOKEN_WHILE;	}

@@ -29,7 +29,7 @@ static void dump_insn(ast_node_t *node) {
 }
 
 const static char *ast_type_str[]={
-	"INT", "FLOAT",
+	"NUMBER",
 	"PLUS", "MINUS", "TIMES", "DIVIDE",
 	"FOR", "IF", "WHILE",
 	"TEQ", "TNEQ", "TL", "TLEQ",
@@ -41,12 +41,14 @@ const static char *ast_type_str[]={
 	"DROP",
 	"ASSIGN",
 	"VAR",
-	"DECLARE",
+	"DECLARE", "DECLARE_ARRAY",
 	"LOCALSIZE",
 	"INST",
 	"RETURN",
 	"SYSCALL",
 	"FUNCPTR",
+	"ARRAY_DEREF",
+	"ASSIGN_ARRAY_MEMBER",
 };
 
 
@@ -69,10 +71,9 @@ static void dump_node(ast_node_t *node, int depth) {
 	}
 	printf("%s", ast_type_str[node->type]);
 	if (node->name) printf(" '%s'", node->name);
-	if (node->type==AST_TYPE_INT) printf(" (%d)", node->numberi);
-	if (node->type==AST_TYPE_FLOAT) printf(" (%f)", node->numberf);
-	if (node->type==AST_TYPE_LOCALSIZE) printf(" (%i entries)", node->numberi);
-	if (node->type==AST_TYPE_DECLARE) printf(" (position is %d)", node->valpos);
+	if (node->type==AST_TYPE_NUMBER) printf(" (%f)", node->number/65536.0);
+	if (node->type==AST_TYPE_LOCALSIZE) printf(" (%i entries)", node->number);
+	if (node->type==AST_TYPE_DECLARE) printf(" (position is %d, size %d)", node->valpos, node->size);
 	if (node->type==AST_TYPE_FUNCDEFARG) printf(" (position is %d)", node->valpos);
 	if (node->type==AST_TYPE_INSN) {
 		printf(":\t");

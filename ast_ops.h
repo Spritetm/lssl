@@ -1,5 +1,6 @@
 #pragma once
 
+void ast_ops_collate_consts(ast_node_t *node);
 void ast_ops_attach_symbol_defs(ast_node_t *node);
 void ast_ops_add_trailing_return(ast_node_t *node);
 void ast_ops_var_place(ast_node_t *node);
