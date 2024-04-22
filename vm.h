@@ -5,7 +5,8 @@ typedef enum {
 	LSSL_VM_ERR_NONE=0,
 	LSSL_VM_ERR_STACK_OVF,
 	LSSL_VM_ERR_STACK_UDF,
-	LSSL_VM_ERR_UNK_OP
+	LSSL_VM_ERR_UNK_OP,
+	LSSL_VM_ERR_ARRAY_OOB
 } vm_error_en;
 
 static inline const char *vm_err_to_str(vm_error_en error) {

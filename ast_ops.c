@@ -84,19 +84,42 @@ static ast_node_t *find_symbol(ast_sym_list_t *list, const char *name) {
 	return NULL;
 }
 
-static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
+static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_global) {
 	int old_sym_pos=syms->node_pos;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		//Add local vars to list of syms.
 		if (n->type==AST_TYPE_DECLARE) {
 			add_sym(syms, n);
+		} else if (n->type==AST_TYPE_DECLARE_ARRAY) {
+			add_sym(syms, n);
 		} else if (n->type==AST_TYPE_FUNCDEFARG) {
 			add_sym(syms, n);
+		} else if (n->type==AST_TYPE_ASSIGN_ARRAY_MEMBER ||
+					n->type==AST_TYPE_ARRAY_DEREF) {
+			if (is_global) {
+				panic_error(n, "Array dereference on global level: %s", n->name);
+				return;
+			}
+			//Find variable symbol and resolve
+			ast_node_t *s=find_symbol(syms, n->name);
+			if (!s) {
+				panic_error(n, "Undefined array %s", n->name);
+				return;
+			}
+			if (s->type!=AST_TYPE_DECLARE_ARRAY) {
+				panic_error(n, "Cannot dereference non-array %s", n->name);
+				return;
+			}
+			n->value=s;
 		} else if (n->type==AST_TYPE_VAR || 
 					n->type==AST_TYPE_ASSIGN ||
 					n->type==AST_TYPE_POST_ADD ||
 					n->type==AST_TYPE_PRE_ADD
 					) {
+			if (is_global) {
+				panic_error(n, "Not allowed on global level: %s", n->name);
+				return;
+			}
 			//Find variable symbol and resolve
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (!s) {
@@ -137,12 +160,11 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 					//Change node to reflect.
 					n->type=AST_TYPE_SYSCALL;
 					n->valpos=callno;
-					printf("syscall %d\n", callno);
 				}
 			}
 		}
 		//Recursively process sub-nodes
-		if (n->children) annotate_symbols(n->children, syms);
+		if (n->children) annotate_symbols(n->children, syms, 0);
 	}
 
 	//restore old pos, deleting local var defs
@@ -181,16 +203,17 @@ void ast_ops_attach_symbol_defs(ast_node_t *node) {
 	syms->size=1024;
 	syms->nodes=calloc(sizeof(ast_node_t*), syms->size);
 
-	//Find global vars and function defs; these should always be accessible.
+	//Find global vars and function defs; these should always be accessible, even if the definition
+	//is later than where they're called/invoked.
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_FUNCDEF || n->type==AST_TYPE_DECLARE) {
+		if (n->type==AST_TYPE_FUNCDEF || n->type==AST_TYPE_DECLARE || n->type==AST_TYPE_DECLARE_ARRAY) {
 			add_sym(syms, n);
 		}
 	}
 
 	//Walk the entire program. We add and remove local vars on the fly and add
 	//symbol pointers to var references.
-	annotate_symbols(node, syms);
+	annotate_symbols(node, syms, 1);
 
 	free(syms->nodes);
 	free(syms);
@@ -228,7 +251,7 @@ static int block_place_locals(ast_node_t * node, int start_pos) {
 	//Give position to local vars. Also adds size of locals (but not subblocks) to `pos`.
 	int pos=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DECLARE) {
+		if (n->type==AST_TYPE_DECLARE || n->type==AST_TYPE_DECLARE_ARRAY) {
 			n->valpos=start_pos+pos;
 			pos+=n->size;
 		}
@@ -443,7 +466,7 @@ static int globals_size(ast_node_t *node) {
 	//Find globals first.
 	int glob_size=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DECLARE) {
+		if (n->type==AST_TYPE_DECLARE || n->type==AST_TYPE_DECLARE_ARRAY) {
 			glob_size+=n->size;
 		}
 	}
@@ -462,6 +485,18 @@ void ast_ops_add_program_start(ast_node_t *node, const char *main_fn_name) {
 		}
 	}
 	printf("Warning: no function '%s' found. Using first function defined instead.\n", main_fn_name);
+}
+
+void ast_ops_add_size_to_array_defs(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_DECLARE_ARRAY) {
+			if (n->children->type!=AST_TYPE_NUMBER || n->children->returns!=AST_RETURNS_CONST) {
+				panic_error(n, "Array declaration must have const number of elements: %s", n->name);
+			}
+			n->size=(n->children->number>>16)+2; //extra 2 positions for address and size
+		}
+		if (n->children) ast_ops_add_size_to_array_defs(n->children);
+	}
 }
 
 void ast_ops_add_array_initializers(ast_node_t *node) {
@@ -484,6 +519,7 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_fix_parents(prognode);
 	ast_ops_add_program_start(prognode, "main");
 	ast_ops_collate_consts(prognode);
+	ast_ops_add_size_to_array_defs(prognode);
 	ast_ops_attach_symbol_defs(prognode);
 	ast_ops_fix_parents(prognode);
 	ast_ops_add_trailing_return(prognode);

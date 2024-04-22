@@ -112,6 +112,7 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 1)); //initial
 		codegen_node(nth_param(n, 2)); //condition
 		codegen_node(nth_param(n, 3)); //increment
+		codegen_node(nth_param(n, 4)); //body
 		//dummy so we can jump back there
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_NOP, 1);
 		//conditional jump to end
@@ -213,6 +214,33 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_GOTO) {
 		ast_node_t *j=insert_insn_before_arg_eval(n, INSN_JMP);
 		j->value=n->value;
+	} else if (n->type==AST_TYPE_DECLARE_ARRAY) {
+		//array needs initialization
+		ast_node_t *j=insert_insn_before_arg_eval(n, INSN_PUSH_I);
+		j->insn_arg=n->size;
+		ast_node_t *k=insert_insn_before_arg_eval(n, (n->parent)?INSN_ARRAYINIT:INSN_ARRAYINIT_G);
+		k->value=n;
+	} else if (n->type==AST_TYPE_ARRAY_DEREF) {
+		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
+			panic_error(n, "Eek! Array index isn't a number!");
+			return;
+		}
+		codegen_node(n->children);
+		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_RD_ARR:INSN_RD_G_ARR, 1);
+		i->value=n->value;
+	} else if (n->type==AST_TYPE_ASSIGN_ARRAY_MEMBER) {
+		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
+			panic_error(n, "Eek! Array index isn't a number!");
+			return;
+		}
+		if (!(n->children->sibling->returns==AST_RETURNS_NUMBER || n->children->sibling->returns==AST_RETURNS_CONST)) {
+			panic_error(n, "Eek! Value assigned to array isn't a number!");
+			return;
+		}
+		codegen_node(nth_param(n, 1)); //index
+		codegen_node(nth_param(n, 2)); //value
+		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_WR_ARR:INSN_WR_G_ARR, 2);
+		i->value=n->value;
 	} else {
 		panic_error(n, "Eek! Unknown ast type %d\n", n->type);
 	}

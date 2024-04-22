@@ -17,7 +17,7 @@ static void dump_insn(ast_node_t *node) {
 		printf("%s %d", lssl_vm_ops[i].op, node->insn_arg);
 	} else if (lssl_vm_ops[i].argtype==ARG_REAL) {
 		printf("%s %f", lssl_vm_ops[i].op, (node->insn_arg/65536.0));
-	} else if (lssl_vm_ops[i].argtype==ARG_VAR) {
+	} else if (lssl_vm_ops[i].argtype==ARG_VAR || lssl_vm_ops[i].argtype==ARG_ARRAY) {
 		printf("%s [%d] ; %s", lssl_vm_ops[i].op, node->insn_arg, node->value->name);
 	} else if (lssl_vm_ops[i].argtype==ARG_LABEL) {
 		printf("%s %d", lssl_vm_ops[i].op, node->insn_arg);
@@ -78,6 +78,7 @@ static void dump_node(ast_node_t *node, int depth) {
 	if (node->type==AST_TYPE_NUMBER) printf(" (%f)", node->number/65536.0);
 	if (node->type==AST_TYPE_LOCALSIZE) printf(" (%i entries)", node->number);
 	if (node->type==AST_TYPE_DECLARE) printf(" (position is %d, size %d)", node->valpos, node->size);
+	if (node->type==AST_TYPE_DECLARE_ARRAY) printf(" (position is %d, size %d)", node->valpos, node->size);
 	if (node->type==AST_TYPE_FUNCDEFARG) printf(" (position is %d)", node->valpos);
 	if (node->type==AST_TYPE_INSN) {
 		printf(":\t");

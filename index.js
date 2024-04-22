@@ -217,6 +217,7 @@ function syntax_highlight() {
 
 
 function led_tick() {
+
 	const canvas = document.querySelector("#leds");
 	const ctx = canvas.getContext("2d");
 	for (var i=0; i<100; i++) {
