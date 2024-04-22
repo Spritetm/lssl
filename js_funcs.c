@@ -27,10 +27,10 @@ void recompile(char *code) {
 	yylex_init(&myscanner);
 	yy_scan_string(code, myscanner);
 
-	ast_node_t *prognode=NULL;
+	ast_node_t *prognode=ast_gen_program_start_node();
 
-	yyparse(&prognode, myscanner);
-	if (prognode==NULL) return;
+	yyparse(&prognode->sibling, myscanner);
+	if (prognode->sibling==NULL) return;
 	ast_ops_do_compile(prognode);
 
 	int bin_len;

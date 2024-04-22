@@ -26,10 +26,10 @@ int main(int argc, char **argv) {
 	yylex_init(&myscanner);
     yy_scan_string(buf, myscanner);
 
-	ast_node_t *prognode=NULL;
+	ast_node_t *prognode=ast_gen_program_start_node();
 
-	yyparse(&prognode, myscanner);
-	if (!prognode) {
+	yyparse(&prognode->sibling, myscanner);
+	if (!prognode->sibling) {
 		printf("Parser found error.\n");
 		exit(1);
 	}

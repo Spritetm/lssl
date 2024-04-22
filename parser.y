@@ -49,6 +49,7 @@ while (0)
 %token TOKEN_FUNCTION
 %token TOKEN_EQ TOKEN_NEQ TOKEN_L TOKEN_G TOKEN_LEQ TOKEN_GEQ
 %token TOKEN_RETURN
+%token TOKEN_PLUSPLUS TOKEN_MINUSMINUS
 
 %define api.pure full
 %parse-param {ast_node_t **program}
@@ -187,7 +188,7 @@ vardef: TOKEN_VAR TOKEN_STR {
 		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN, &@$);
 		a->name=strdup($2);
 		a->returns=$4->returns;
-		ast_add_sibling($$, a);
+		ast_add_child($$, a);
 		ast_add_child(a, $4);
 	}
 | TOKEN_VAR TOKEN_STR TOKEN_SQBOPEN expr TOKEN_SQBCLOSE {
@@ -240,12 +241,37 @@ term: TOKEN_NUMBER {
 	 }
 | TOKEN_STR TOKEN_SQBOPEN expr TOKEN_SQBCLOSE {
 		$$=ast_new_node(AST_TYPE_ARRAY_DEREF, &@$);
+		$$->name=strdup($1);
 		ast_add_child($$, $3);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
 | TOKEN_STR { 
 		$$=ast_new_node(AST_TYPE_VAR, &@$);
 		$$->name=strdup($1);
+		$$->returns=AST_RETURNS_NUMBER;
+	}
+| TOKEN_STR TOKEN_PLUSPLUS {
+		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);
+		$$->name=strdup($1);
+		$$->number=(1<<16);
+		$$->returns=AST_RETURNS_NUMBER;
+	}
+| TOKEN_STR TOKEN_MINUSMINUS {
+		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);
+		$$->name=strdup($1);
+		$$->number=-(1<<16);
+		$$->returns=AST_RETURNS_NUMBER;
+	}
+| TOKEN_PLUSPLUS TOKEN_STR {
+		$$=ast_new_node(AST_TYPE_PRE_ADD, &@$);
+		$$->name=strdup($2);
+		$$->number=(1<<16);
+		$$->returns=AST_RETURNS_NUMBER;
+	}
+| TOKEN_MINUSMINUS TOKEN_STR {
+		$$=ast_new_node(AST_TYPE_PRE_ADD, &@$);
+		$$->name=strdup($2);
+		$$->number=-(1<<16);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
 | func_call

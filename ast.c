@@ -49,6 +49,9 @@ const static char *ast_type_str[]={
 	"FUNCPTR",
 	"ARRAY_DEREF",
 	"ASSIGN_ARRAY_MEMBER",
+	"POST_ADD", "PRE_ADD",
+	"PROGRAM_START",
+	"GOTO"
 };
 
 
@@ -71,6 +74,7 @@ static void dump_node(ast_node_t *node, int depth) {
 	}
 	printf("%s", ast_type_str[node->type]);
 	if (node->name) printf(" '%s'", node->name);
+	if (node->value) printf(" (value '%s')", node->value->name);
 	if (node->type==AST_TYPE_NUMBER) printf(" (%f)", node->number/65536.0);
 	if (node->type==AST_TYPE_LOCALSIZE) printf(" (%i entries)", node->number);
 	if (node->type==AST_TYPE_DECLARE) printf(" (position is %d, size %d)", node->valpos, node->size);
@@ -124,3 +128,10 @@ ast_node_t *ast_new_node_2chld(ast_type_en type, file_loc_t *loc, ast_node_t *c1
 	return r;
 }
 
+
+//This generates a dummy node that is always the 1st item as otherwise we cannot pre-pend nodes before
+//the main program.
+ast_node_t *ast_gen_program_start_node() {
+	file_loc_t loc={};
+	return ast_new_node(AST_TYPE_PROGRAM_START, &loc);
+}

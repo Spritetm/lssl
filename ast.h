@@ -26,6 +26,9 @@ typedef enum {
 	AST_TYPE_FUNCPTR,
 	AST_TYPE_ARRAY_DEREF,
 	AST_TYPE_ASSIGN_ARRAY_MEMBER,
+	AST_TYPE_POST_ADD, AST_TYPE_PRE_ADD,
+	AST_TYPE_PROGRAM_START, //always 1st node
+	AST_TYPE_GOTO, //converts to a JMP, not accessible via user code
 	AST_TYPE_MAX //always last item
 } ast_type_en;
 
@@ -70,6 +73,7 @@ static inline void ast_add_sibling(ast_node_t *t, ast_node_t *n) {
 }
 
 
+ast_node_t *ast_gen_program_start_node();
 ast_node_t *ast_new_node(ast_type_en type, file_loc_t *loc);
 ast_node_t *ast_new_node_2chld(ast_type_en type, file_loc_t *loc, ast_node_t *c1, ast_node_t *c2);
 void ast_dump(ast_node_t *node);

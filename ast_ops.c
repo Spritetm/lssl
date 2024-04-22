@@ -10,6 +10,18 @@
 //Mental node: definition of 'fixup' is finding a position (e.g. in ram) for a symbol and changing
 //the instructions to match that.
 
+/*
+Urgh, non-POD variables.
+
+We store the entire thing on the stack?
+- Pointer to data
+- Data [size, elements]
+
+Needs initialization. Pointer needs to point to data. Possibly initialization is needed.
+
+*/
+
+
 
 //This collates const values, e.g. '(2+4)/3)' gets collated into a single const number '2'.
 static void ast_ops_collate_consts_node(ast_node_t *node) {
@@ -49,18 +61,6 @@ void ast_ops_collate_consts(ast_node_t *node) {
 	}
 }
 
-//Convert DECLARE_ARRAY into DECLARE with set size
-void ast_ops_convert_declare_array(ast_node_t *node) {
-	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->children) ast_ops_convert_declare_array(n->children);
-		if (n->type==AST_TYPE_DECLARE_ARRAY) {
-			n->type=AST_TYPE_DECLARE;
-			n->size=(n->children->number)>>16;
-			n->children=n->children->sibling; //remove size node
-		}
-	}
-}
-
 typedef struct {
 	ast_node_t **nodes;
 	int node_pos;
@@ -92,7 +92,11 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 			add_sym(syms, n);
 		} else if (n->type==AST_TYPE_FUNCDEFARG) {
 			add_sym(syms, n);
-		} else if (n->type==AST_TYPE_VAR || n->type==AST_TYPE_ASSIGN) {
+		} else if (n->type==AST_TYPE_VAR || 
+					n->type==AST_TYPE_ASSIGN ||
+					n->type==AST_TYPE_POST_ADD ||
+					n->type==AST_TYPE_PRE_ADD
+					) {
 			//Find variable symbol and resolve
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (!s) {
@@ -105,7 +109,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 				n->returns=AST_RETURNS_FUNCTION;
 			}
 			n->value=s;
-		} else if (n->type==AST_TYPE_FUNCCALL) {
+		} else if (n->type==AST_TYPE_FUNCCALL || n->type==AST_TYPE_GOTO) {
 			//Find function symbol and resolve.
 			int argct=0;
 			for (ast_node_t *i=n->children; i!=NULL; i=i->sibling) argct++;
@@ -120,7 +124,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms) {
 			} else {
 				//Perhaps it's a syscall?
 				int callno=vm_syscall_handle_for_name(n->name);
-				if (callno<0) {
+				if (callno<0 || n->type==AST_TYPE_GOTO) {
 					panic_error(n, "Undefined var/function %s", n->name);
 					return;
 				} else {
@@ -185,11 +189,9 @@ void ast_ops_attach_symbol_defs(ast_node_t *node) {
 	}
 
 	//Walk the entire program. We add and remove local vars on the fly and add
-	//symbol pointers to var references. Note: this means we don't allow var
-	//references at the top level.
-	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->children) annotate_symbols(n->children, syms);
-	}
+	//symbol pointers to var references.
+	annotate_symbols(node, syms);
+
 	free(syms->nodes);
 	free(syms);
 }
@@ -448,16 +450,23 @@ static int globals_size(ast_node_t *node) {
 	return glob_size;
 }
 
-static int initial_pc(ast_node_t *node, const char *main_fn_name) {
+//Program should start (after array initializers) with a jump to 'main'.
+void ast_ops_add_program_start(ast_node_t *node, const char *main_fn_name) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEF && strcmp(n->name, main_fn_name)==0) {
-			return n->valpos;
+			ast_node_t *d=ast_new_node(AST_TYPE_GOTO, &node->loc);
+			d->name=strdup(main_fn_name);
+			d->sibling=node->sibling;
+			node->sibling=d;
+			return;
 		}
 	}
 	printf("Warning: no function '%s' found. Using first function defined instead.\n", main_fn_name);
-	return 0;
 }
 
+void ast_ops_add_array_initializers(ast_node_t *node) {
+
+}
 
 uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 	prog_t p={};
@@ -465,7 +474,6 @@ uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 	p.data=malloc(PROG_INC);
 	add_long_prog(&p, LSSL_VM_VER);
 	add_long_prog(&p, globals_size(node));
-	add_long_prog(&p, initial_pc(node, "main"));
 	gen_binary(node, &p);
 	*len=p.len;
 	return p.data;
@@ -474,17 +482,19 @@ uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 //Calls all ops (except binary generation) in the proper order
 void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_fix_parents(prognode);
+	ast_ops_add_program_start(prognode, "main");
 	ast_ops_collate_consts(prognode);
-	ast_ops_convert_declare_array(prognode);
 	ast_ops_attach_symbol_defs(prognode);
 	ast_ops_fix_parents(prognode);
 	ast_ops_add_trailing_return(prognode);
 	ast_ops_fix_parents(prognode);
 	ast_ops_var_place(prognode);
+//	ast_dump(prognode);
 	codegen(prognode);
-	ast_ops_position_insns(prognode);
+	ast_ops_add_array_initializers(prognode);
 	ast_ops_fixup_enter_leave_return(prognode);
 	ast_ops_remove_useless_ops(prognode);
+	ast_ops_position_insns(prognode);
 	ast_ops_assign_addr_to_fndef_node(prognode);
 	ast_ops_fixup_addrs(prognode);
 	ast_dump(prognode);

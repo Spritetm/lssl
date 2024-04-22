@@ -38,6 +38,8 @@ hexdigit	[0-9A-Fa-f]
 "\n"					{ return TOKEN_EOL;			}
 "+"						{ return TOKEN_PLUS;		}
 "-"						{ return TOKEN_MINUS;		}
+"++"					{ return TOKEN_PLUSPLUS;	}
+"--"					{ return TOKEN_MINUSMINUS;	}
 "*"						{ return TOKEN_TIMES;		}
 "/"						{ return TOKEN_SLASH;		}
 "("						{ return TOKEN_LPAREN;		}
