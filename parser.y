@@ -71,7 +71,7 @@ while (0)
 %type<ast> vardef expr compf factor br_term term func_call funccallargs
 %type<ast> funcdefarg return_statement 
 %type<ast> structdef structmembers structmember 
-%type<ast> dereference array_dereference var_deref
+%type<ast> dereference array_dereference var_deref var_ref
 
 %%
 
@@ -219,11 +219,10 @@ for_statement: TOKEN_FOR TOKEN_LPAREN statement TOKEN_SEMICOLON expr TOKEN_SEMIC
 		ast_add_child($$, $9);
 	}
 
-assignment: TOKEN_STR dereference TOKEN_ASSIGN expr {
+assignment: var_ref TOKEN_ASSIGN expr {
 		$$=ast_new_node(AST_TYPE_ASSIGN, &@$);
-		$$->name=strdup($1);
-		ast_add_child($$, $2);
-		ast_add_child($$, $4);
+		ast_add_child($$, $1);
+		ast_add_child($$, $3);
 	}
 
 vardef: TOKEN_VAR TOKEN_STR array_dereference {
@@ -341,6 +340,16 @@ br_term: term
 	}
 
 
+//var_ref returns an *object pointer* to a variable or struct/arraymember
+var_ref: TOKEN_STR dereference {
+		$$=ast_new_node(AST_TYPE_REF, &@$);
+		$$->name=strdup($1);
+		if ($2) ast_add_child($$, $2);
+		$$->returns=AST_RETURNS_NUMBER; //...we hope
+}
+
+
+//var_deref returns the *value* of a variable or struct/arraymember
 var_deref: TOKEN_STR dereference {
 		$$=ast_new_node(AST_TYPE_DEREF, &@$);
 		$$->name=strdup($1);

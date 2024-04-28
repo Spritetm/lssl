@@ -59,6 +59,8 @@ static void dump_node(ast_node_t *node, int depth) {
 	if (node->type==AST_TYPE_DECLARE) printf(" (position is %d, size %d)", node->valpos, node->size);
 	if (node->type==AST_TYPE_DECLARE_ARRAY) printf(" (position is %d, size %d)", node->valpos, node->size);
 	if (node->type==AST_TYPE_FUNCDEFARG) printf(" (position is %d)", node->valpos);
+	if (node->type==AST_TYPE_ARRAY_INIT) printf(" (item size %d)", node->size);
+	if (node->type==AST_TYPE_STRUCT_INIT) printf(" (struct size %d)", node->size);
 	if (node->type==AST_TYPE_INSN) {
 		printf(":\t");
 		dump_insn(node);

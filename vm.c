@@ -51,6 +51,25 @@ error:
 }
 
 
+/*
+Stack layout:
+0: global var A
+1: global var B
+....
+N: global var N
+N+1..M: global array/struct X
+M+1..O: global array/struct Y
+
+fn1 BP
+fn1 return PC
+<--- BP
+local var A
+local var B
+allocated array/struct C
+<--- SP
+
+*/
+
 //static void dump_stack(lssl_vm_t *vm) {
 //	for (int i=0; i<vm->sp; i++) printf("%02X (% 3d) %x\n", i, i-vm->sp, vm->stack[i]);
 //}
@@ -141,12 +160,9 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			if (pop(vm)==0) new_pc=arg;
 		} else if (op==INSN_ENTER) {
 			vm->sp+=arg;
-		} else if (op==INSN_LEAVE) {
-			int32_t v=pop(vm);
-			vm->sp-=arg;
-			push(vm, v);
 		} else if (op==INSN_RETURN) {
 			int32_t v=pop(vm);
+			vm->sp=vm->bp; //clear local vars, local objs
 			new_pc=pop(vm);
 			vm->bp=pop(vm);
 			vm->sp=vm->sp-arg;
@@ -198,37 +214,6 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			int32_t v=pop(vm);
 			push(vm, v);
 			push(vm, v);
-		} else if (op==INSN_ARRAYINIT || op==INSN_ARRAYINIT_G) {
-			int size=pop(vm)>>16;
-			int addr=(op==INSN_ARRAYINIT)?vm->bp+arg:arg;
-			vm->stack[addr]=addr+1;
-			vm->stack[addr+1]=size;
-			for (int i=0; i<size; i++) vm->stack[addr+2+i]=0;
-/*
-		} else if (op==INSN_RD_ARR || op==INSN_RD_G_ARR) {
-			int pos=pop(vm)>>16;
-			int addr=(op==INSN_RD_ARR)?vm->bp+arg:arg;
-			int data_addr=vm->stack[addr];
-			int size=vm->stack[data_addr];
-			if (pos<0 || pos>size) {
-				printf("Array out of bounds: %d @ pc 0x%x\n", pos, vm->pc);
-				vm->error=LSSL_VM_ERR_ARRAY_OOB;
-			} else {
-				push(vm, vm->stack[data_addr+1+pos]);
-			}
-		} else if (op==INSN_WR_ARR || op==INSN_WR_G_ARR) {
-			int32_t val=pop(vm);
-			int pos=pop(vm)>>16;
-			int addr=(op==INSN_WR_ARR)?vm->bp+arg:arg;
-			int data_addr=vm->stack[addr];
-			int size=vm->stack[data_addr];
-			if (pos<0 || pos>size) {
-				printf("Array out of bounds: %d @ pc 0x%x\n", pos, vm->pc);
-				vm->error=LSSL_VM_ERR_ARRAY_OOB;
-			} else {
-				vm->stack[data_addr+1+pos]=val;
-			}
-*/
 		} else {
 			printf("Unknown op %d @ pc 0x%x\n", op, vm->pc);
 			vm->error=LSSL_VM_ERR_UNK_OP;

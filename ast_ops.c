@@ -199,14 +199,10 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 			}
 			n->value=s;
 		} else if (n->type==AST_TYPE_DEREF || 
-					n->type==AST_TYPE_ASSIGN ||
+					n->type==AST_TYPE_REF ||
 					n->type==AST_TYPE_POST_ADD ||
 					n->type==AST_TYPE_PRE_ADD
 					) {
-			if (is_global) {
-				panic_error(n, "Not allowed on global level: %s", n->name);
-				return;
-			}
 			//Find variable symbol and resolve
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (!s) {
@@ -258,6 +254,30 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 	syms->node_pos=old_sym_pos;
 }
 
+
+//Recursively goes through ast to attach symbol definitions
+void ast_ops_attach_symbol_defs(ast_node_t *node) {
+	ast_sym_list_t *syms=calloc(sizeof(ast_sym_list_t), 1);
+	syms->size=1024;
+	syms->nodes=calloc(sizeof(ast_node_t*), syms->size);
+
+	//Find global vars and function defs; these should always be accessible, even if the definition
+	//is later than where they're called/invoked.
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_FUNCDEF || n->type==AST_TYPE_DECLARE) {
+			add_sym(syms, n);
+		}
+	}
+
+	//Walk the entire program. We add and remove local vars on the fly and add
+	//symbol pointers to var references.
+	annotate_symbols(node, syms, 1);
+
+	free(syms->nodes);
+	free(syms);
+}
+
+
 //Adds a 'return 0' to the end of the function, if none is there.
 void ast_ops_add_trailing_return(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
@@ -283,28 +303,6 @@ void ast_ops_add_trailing_return(ast_node_t *node) {
 	}
 }
 
-
-//Recursively goes through ast to attach symbol definitions
-void ast_ops_attach_symbol_defs(ast_node_t *node) {
-	ast_sym_list_t *syms=calloc(sizeof(ast_sym_list_t), 1);
-	syms->size=1024;
-	syms->nodes=calloc(sizeof(ast_node_t*), syms->size);
-
-	//Find global vars and function defs; these should always be accessible, even if the definition
-	//is later than where they're called/invoked.
-	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_FUNCDEF || n->type==AST_TYPE_DECLARE || n->type==AST_TYPE_DECLARE_ARRAY) {
-			add_sym(syms, n);
-		}
-	}
-
-	//Walk the entire program. We add and remove local vars on the fly and add
-	//symbol pointers to var references.
-	annotate_symbols(node, syms, 1);
-
-	free(syms->nodes);
-	free(syms);
-}
 
 static int arg_size_for_fn(ast_node_t *node) {
 	int arg_size=0;
@@ -391,8 +389,6 @@ void ast_ops_remove_useless_ops(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_INSN) {
 			if (n->insn_type==INSN_ENTER && n->insn_arg==0) {
-				n->insn_type=INSN_NOP;
-			} else if (n->insn_type==INSN_LEAVE && n->insn_arg==0) {
 				n->insn_type=INSN_NOP;
 			}
 		}
@@ -498,31 +494,29 @@ void ast_ops_position_insns(ast_node_t *node) {
 	ast_ops_position_insns_from(node, 0);
 }
 
-void fixup_enter_leave_return(ast_node_t *node, int arg_size, int localsize) {
+void fixup_enter_return(ast_node_t *node, int arg_size, int localsize) {
 	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_INSN) {
 			if (n->insn_type==INSN_RETURN) {
 				n->insn_arg=arg_size;
 			} else if (n->insn_type==INSN_ENTER) {
 				n->insn_arg=localsize;
-			} else if (n->insn_type==INSN_LEAVE) {
-				n->insn_arg=localsize;
 			}
 		}
-		if (n->children) fixup_enter_leave_return(n, arg_size, localsize);
+		if (n->children) fixup_enter_return(n, arg_size, localsize);
 	}
 }
 
 
-//Fixes up enter/leave/return instructions
-void ast_ops_fixup_enter_leave_return(ast_node_t *node) {
+//Fixes up enter/return instructions
+void ast_ops_fixup_enter_return(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEF) {
 			int arg_size=arg_size_for_fn(n);
 			ast_node_t *ls=n->children;
 			while (ls && ls->type!=AST_TYPE_LOCALSIZE) ls=ls->sibling;
 			int localsize=ls->number;
-			fixup_enter_leave_return(n, arg_size, localsize);
+			fixup_enter_return(n, arg_size, localsize);
 		}
 	}
 }
@@ -665,8 +659,95 @@ void ast_ops_add_size_to_array_defs(ast_node_t *node) {
 	}
 }
 
-void ast_ops_add_array_initializers(ast_node_t *node) {
+static int size_of_obj(ast_node_t *node) {
+	int ret=0;
+	if (!node) return 1;
+	if (node->type==AST_TYPE_STRUCTDEF) {
+		for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
+			if (n->type==AST_TYPE_STRUCTMEMBER) {
+				ret+=size_of_obj(n);
+			}
+		}
+	} else if (node->type==AST_TYPE_STRUCTMEMBER) {
+		ast_node_t *a=ast_find_type(node->children, AST_TYPE_ARRAYREF);
+		if (!a) a=ast_find_type(node, AST_TYPE_STRUCTREF);
+		if (a) {
+			ret=size_of_obj(a);
+		} else {
+			ret=1;
+		}
+	} else if (node->type==AST_TYPE_ARRAYREF) {
+		ast_node_t *s=ast_find_type(node->children, AST_TYPE_NUMBER);
+		if (!s) {
+			panic_error(node, "Non-toplevel array size must be const");
+			return 0;
+		}
+		int count=s->number>>16;
+		ast_node_t *a=ast_find_type(node->children, AST_TYPE_ARRAYREF);
+		if (!a) a=ast_find_type(node->children, AST_TYPE_STRUCTREF);
+		if (a) {
+			ret=count*size_of_obj(a);
+		} else {
+			ret=count;
+		}
+	} else if (node->type==AST_TYPE_STRUCTREF) {
+		ret=size_of_obj(node->value); //the structdef
+	}
+	return ret;
+}
 
+static void convert_local_declare_to_init(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_DECLARE) {
+			ast_node_t *a=ast_find_type(n->children, AST_TYPE_ARRAYREF);
+			if (a) {
+				n->type=AST_TYPE_ARRAY_INIT;
+				n->size=size_of_obj(a->children);
+			}
+			ast_node_t *s=ast_find_type(n->children, AST_TYPE_STRUCTREF);
+			if (s) {
+				n->type=AST_TYPE_STRUCT_INIT;
+				n->size=size_of_obj(s);
+			}
+		}
+	}
+}
+
+void ast_ops_add_obj_initializers(ast_node_t *node) {
+	//On the global level, we want to collect all initializers and put them at the very
+	//start of the program.
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_DECLARE) {
+			ast_node_t *a=ast_find_type(n->children, AST_TYPE_ARRAYREF);
+			if (a) {
+				ast_node_t *i=ast_new_node(AST_TYPE_ARRAY_INIT, &node->loc);
+				//Do some surgery: move the size argument from the arrayref to the
+				//obj_init node.
+				//Assumes the size argument always is the 1st arg in the arrayref.
+				i->children=a->children;
+				a->children=a->children->sibling;
+				i->size=size_of_obj(a->children);
+				i->children->sibling=NULL;
+				i->value=n;
+				//insert at top of program
+				i->sibling=node->sibling;
+				node->sibling=i;
+			}
+			ast_node_t *s=ast_find_type(n->children, AST_TYPE_STRUCTREF);
+			if (s) {
+				ast_node_t *i=ast_new_node(AST_TYPE_STRUCT_INIT, &node->loc);
+				i->size=size_of_obj(s);
+				i->value=n;
+				//insert at top of program
+				i->sibling=node->sibling;
+				node->sibling=i;
+			}
+		}
+		//Locally, we convert DECLARE into ARRAY/STRUCT_INITs.
+		if (n->children) {
+			convert_local_declare_to_init(n->children);
+		}
+	}
 }
 
 uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
@@ -692,13 +773,14 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_add_trailing_return(prognode);
 	ast_ops_fix_parents(prognode);
 	ast_ops_var_place(prognode);
-//	ast_dump(prognode);
+	ast_ops_add_obj_initializers(prognode);
+/*
 	codegen(prognode);
-	ast_ops_add_array_initializers(prognode);
-	ast_ops_fixup_enter_leave_return(prognode);
+	ast_ops_fixup_enter_return(prognode);
 	ast_ops_remove_useless_ops(prognode);
 	ast_ops_position_insns(prognode);
 	ast_ops_assign_addr_to_fndef_node(prognode);
 	ast_ops_fixup_addrs(prognode);
+*/
 	ast_dump(prognode);
 }

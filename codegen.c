@@ -179,13 +179,12 @@ static void codegen_node(ast_node_t *n) {
 		i->insn_arg=n->number>>16;
 	} else if (n->type==AST_TYPE_RETURN) {
 		codegen_node(nth_param(n, 1));
-		insert_insn_after_arg_eval(n, INSN_LEAVE, 1);
 		insert_insn_after_arg_eval(n, INSN_RETURN, 1);
 	} else if (n->type==AST_TYPE_DECLARE) {
 		//could have an assign as child
 		if (n->children) codegen_node(nth_param(n, 1));
 	} else if (n->type==AST_TYPE_LOCALSIZE) {
-		//na, enter/leave is resolved elsewhere
+		//na, enter is resolved elsewhere
 	} else if (n->type==AST_TYPE_INSN) {
 		//ignore
 	} else if (n->type==AST_TYPE_PROGRAM_START) {
@@ -206,31 +205,6 @@ static void codegen_node(ast_node_t *n) {
 		j->insn_arg=n->size;
 		ast_node_t *k=insert_insn_before_arg_eval(n, (n->parent)?INSN_ARRAYINIT:INSN_ARRAYINIT_G);
 		k->value=n;
-	} else if (n->type==AST_TYPE_ARRAYREF) {
-/*
-		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
-			panic_error(n, "Eek! Array index isn't a number!");
-			return;
-		}
-		codegen_node(n->children);
-		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_RD_ARR:INSN_RD_G_ARR, 1);
-		i->value=n->value;
-*/
-	} else if (n->type==AST_TYPE_ASSIGN_ARRAY_MEMBER) {
-/*
-		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
-			panic_error(n, "Eek! Array index isn't a number!");
-			return;
-		}
-		if (!(n->children->sibling->returns==AST_RETURNS_NUMBER || n->children->sibling->returns==AST_RETURNS_CONST)) {
-			panic_error(n, "Eek! Value assigned to array isn't a number!");
-			return;
-		}
-		codegen_node(nth_param(n, 1)); //index
-		codegen_node(nth_param(n, 2)); //value
-		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_WR_ARR:INSN_WR_G_ARR, 2);
-		i->value=n->value;
-*/
 	} else if (n->type==AST_TYPE_STRUCTDEF) {
 		//nothing
 	} else if (n->type==AST_TYPE_STRUCTREF) {
@@ -240,12 +214,23 @@ static void codegen_node(ast_node_t *n) {
 		//is never called for such a node.
 		//todo
 	} else if (n->type==AST_TYPE_DEREF) {
+		//Note: deref/ref need to do LEA for POD, RD_VAR (equivalent) for non-POD.
 		codegen_node(nth_param(n, 1));
 		ast_node_t *i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA_G:INSN_LEA);
 		i->value=n->value;
 		insert_insn_after_arg_eval(n, INSN_DEREF, 1);
+	} else if (n->type==AST_TYPE_REF) {
+		codegen_node(nth_param(n, 1));
+		ast_node_t *i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA_G:INSN_LEA);
+		i->value=n->value;
 	} else if (n->type==AST_TYPE_DATATYPE) {
 		//n/a
+	} else if (n->type==AST_TYPE_ARRAYREF) {
+		codegen_node(nth_param(n, 1));
+		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAY_IDX, 1);
+	} else if (n->type==AST_TYPE_STRUCTMEMBER) {
+		codegen_node(nth_param(n, 1));
+		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_STRUCT_IDX);
 	} else {
 		panic_error(n, "Eek! Unknown ast type %d\n", n->type);
 	}
