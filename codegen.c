@@ -37,7 +37,9 @@ static ast_node_t *nth_param(ast_node_t *p, int n) {
 	assert(n!=0); //is error
 	p=p->children;
 	while(p) {
-		if (p->type==AST_TYPE_INSN || p->type==AST_TYPE_LOCALSIZE) {
+		if (p->type==AST_TYPE_INSN || 
+			p->type==AST_TYPE_LOCALSIZE || 
+			p->type==AST_TYPE_DATATYPE) {
 			//ignore
 		} else {
 			n--;
@@ -92,6 +94,7 @@ void handle_rhs_lhs_op(ast_node_t *node, lssl_instr_enum type) {
 }
 
 static void codegen_node(ast_node_t *n) {
+	if (!n) return;
 	if (n->type==AST_TYPE_NUMBER) {
 		if ((n->number&0xffff)==0) {
 			ast_node_t *i=insert_insn_before_arg_eval(n, INSN_PUSH_I);
@@ -165,17 +168,40 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_POP, 1);
 	} else if (n->type==AST_TYPE_ASSIGN) {
-		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
-			panic_error(n, "Eek! Value assigned to variable isn't a number!");
-			return;
-		}
-		codegen_node(n->children);
-		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_WR_VAR:INSN_WR_G_VAR, 1);
-		i->value=n->value;
-	} else if (n->type==AST_TYPE_VAR) {
-		ast_node_t *i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_RD_VAR:INSN_RD_G_VAR);
-		i->value=n->value;
+		//Arg 1: address of thing to assign to
+		//Arg 2: value to assign
+		codegen_node(nth_param(n, 1));
+		codegen_node(nth_param(n, 2));
+		insert_insn_after_arg_eval(n, INSN_WR_VAR, 2);
 	} else if (n->type==AST_TYPE_POST_ADD || n->type==AST_TYPE_PRE_ADD) {
+		codegen_node(nth_param(n, 1));
+		insert_insn_after_arg_eval(n, INSN_DUP, 1);
+		insert_insn_after_arg_eval(n, INSN_DEREF, 1);
+		if (n->type==AST_TYPE_POST_ADD) insert_insn_after_arg_eval(n, INSN_DUP, 1);
+		//preadd: adr, val; postadd: adr, val, val
+		ast_node_t *j;
+		if (n->number&0xffff) {
+			j=insert_insn_after_arg_eval(n, INSN_PUSH_I, 1);
+			j->insn_arg=n->number>>16;
+		} else {
+			j=insert_insn_after_arg_eval(n, INSN_PUSH_R, 1);
+			j->insn_arg=n->number;
+		}
+		insert_insn_after_arg_eval(n, INSN_ADD, );
+		if (n->type==AST_TYPE_PRE_ADD) insert_insn_after_arg_eval(n, INSN_DUP, 1);
+		//preadd: adr, val+n, val+n; postadd: adr, val, val+n
+		insert_insn_after_arg_eval(n, INSN_DIG, 1);
+		j->insn_arg=1;
+		//preadd: adr, val+n, val+n, val+n; postadd: adr, val, val+n, val
+		
+		//Urgh, this is a PITA because the address/val/val+n are in the wrong
+		//place...
+		//ToDo: 
+		// make DIG instruction to grab var at (pc-x) and push it.
+		// make POP take an argument: amount of pos popped?
+
+		
+		
 		ast_node_t *i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_RD_VAR:INSN_RD_G_VAR);
 		i->value=n->value;
 		if (n->type==AST_TYPE_POST_ADD) insert_insn_before_arg_eval(n, INSN_DUP);
@@ -220,14 +246,14 @@ static void codegen_node(ast_node_t *n) {
 		j->insn_arg=n->size;
 		ast_node_t *k=insert_insn_before_arg_eval(n, (n->parent)?INSN_ARRAYINIT:INSN_ARRAYINIT_G);
 		k->value=n;
-	} else if (n->type==AST_TYPE_ARRAY_DEREF) {
+	} else if (n->type==AST_TYPE_ARRAYREF) {
 		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
 			panic_error(n, "Eek! Array index isn't a number!");
 			return;
 		}
 		codegen_node(n->children);
-		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_RD_ARR:INSN_RD_G_ARR, 1);
-		i->value=n->value;
+//		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_RD_ARR:INSN_RD_G_ARR, 1);
+//		i->value=n->value;
 	} else if (n->type==AST_TYPE_ASSIGN_ARRAY_MEMBER) {
 		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
 			panic_error(n, "Eek! Array index isn't a number!");
@@ -241,6 +267,21 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 2)); //value
 		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_WR_ARR:INSN_WR_G_ARR, 2);
 		i->value=n->value;
+	} else if (n->type==AST_TYPE_STRUCTDEF) {
+		//nothing
+	} else if (n->type==AST_TYPE_STRUCTREF) {
+		//todo
+	} else if (n->type==AST_TYPE_STRUCTMEMBER) {
+		//note: this can also happen in structdefs but since those aren't codegen'ned this
+		//is never called for such a node.
+		//todo
+	} else if (n->type==AST_TYPE_DEREF) {
+		codegen_node(nth_param(n, 1));
+		ast_node_t *i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA_G:INSN_LEA);
+		i->value=n->value;
+		insert_insn_after_arg_eval(n, INSN_DEREF, 1);
+	} else if (n->type==AST_TYPE_DATATYPE) {
+		//n/a
 	} else {
 		panic_error(n, "Eek! Unknown ast type %d\n", n->type);
 	}

@@ -28,41 +28,20 @@ static void dump_insn(ast_node_t *node) {
 	}
 }
 
+#define AST_TYPE_ENTRY(x) #x,
 const static char *ast_type_str[]={
-	"NUMBER",
-	"PLUS", "MINUS", "TIMES", "DIVIDE",
-	"FOR", "IF", "WHILE",
-	"TEQ", "TNEQ", "TL", "TLEQ",
-	"FUNCDEF",
-	"FUNCDEFARG",
-	"FUNCCALL",
-	"FUNCCALLARG",
-	"BLOCK",
-	"DROP",
-	"ASSIGN",
-	"VAR",
-	"DECLARE", "DECLARE_ARRAY",
-	"LOCALSIZE",
-	"INST",
-	"RETURN",
-	"SYSCALL",
-	"FUNCPTR",
-	"ARRAY_DEREF",
-	"ASSIGN_ARRAY_MEMBER",
-	"POST_ADD", "PRE_ADD",
-	"PROGRAM_START",
-	"GOTO"
+	AST_TYPES
 };
+#undef AST_TYPE_ENTRY
 
 
 //Dumps a node plus its children. Note: NOT its siblings.
 static void dump_node(ast_node_t *node, int depth) {
-	static_assert(sizeof(ast_type_str)/sizeof(ast_type_str[0])==AST_TYPE_MAX, "ast type desync");
 	if (node==NULL) {
 		printf("dump_node: NULL node passed\n");
 		return;
 	}
-	if (node->type<0 || node->type>=AST_TYPE_MAX) {
+	if (node->type<0 || node->type>=(sizeof(ast_type_str)/sizeof(ast_type_str[0]))) {
 		printf("dump_node: unknown node type %d\n", node->type);
 		return;
 	}
@@ -136,3 +115,36 @@ ast_node_t *ast_gen_program_start_node() {
 	file_loc_t loc={};
 	return ast_new_node(AST_TYPE_PROGRAM_START, &loc);
 }
+
+//Returns the deepest AST_TYPE_ARRAYREF node.
+ast_node_t *ast_find_deepest_arrayref(ast_node_t *node) {
+	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_ARRAYREF) {
+			return ast_find_deepest_arrayref(n);
+		}
+	}
+	return node;
+}
+
+
+//Returns the deepest AST_TYPE_ARRAYREF/STRUCTREF node.
+ast_node_t *ast_find_deepest_ref(ast_node_t *node) {
+	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_ARRAYREF || n->type==AST_TYPE_STRUCTMEMBER) {
+			return ast_find_deepest_ref(n);
+		}
+	}
+	return node;
+}
+
+ast_node_t *ast_find_type(ast_node_t *node, ast_type_en type) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==type) return n;
+	}
+	return NULL;
+}
+
+
+
+
+

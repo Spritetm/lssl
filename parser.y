@@ -50,6 +50,7 @@ while (0)
 %token TOKEN_EQ TOKEN_NEQ TOKEN_L TOKEN_G TOKEN_LEQ TOKEN_GEQ
 %token TOKEN_RETURN
 %token TOKEN_PLUSPLUS TOKEN_MINUSMINUS
+%token TOKEN_STRUCT
 
 %define api.pure full
 %parse-param {ast_node_t **program}
@@ -68,7 +69,9 @@ while (0)
 %type<ast> input input_line statement block funcdef stdaloneexpr
 %type<ast> funcdefargs while_statement if_statement for_statement assignment
 %type<ast> vardef expr compf factor br_term term func_call funccallargs
-%type<ast> funcdefarg return_statement
+%type<ast> funcdefarg return_statement 
+%type<ast> structdef structmembers structmember 
+%type<ast> dereference array_dereference
 
 %%
 
@@ -93,14 +96,14 @@ input: %empty {
 		}
 	}
 
-input_line: statement TOKEN_EOL
-| statement TOKEN_SEMICOLON
+statement_end: TOKEN_EOL | TOKEN_SEMICOLON | statement_end TOKEN_EOL | statement_end TOKEN_SEMICOLON
+
+input_line: statement statement_end
 | block
 
 block: TOKEN_CURLOPEN input TOKEN_CURLCLOSE {
 		$$=ast_new_node(AST_TYPE_BLOCK, &@$);
 		$$->children=$2;
-		$2->parent=$$;
 	}
 
 statement: %empty {
@@ -114,6 +117,60 @@ statement: %empty {
 | while_statement
 | if_statement
 | return_statement
+| structdef
+
+
+structdef: TOKEN_STRUCT TOKEN_STR TOKEN_CURLOPEN structmembers TOKEN_CURLCLOSE {
+		$$=ast_new_node(AST_TYPE_STRUCTDEF, &@$);
+		$$->name=strdup($2);
+		$$->children=$4;
+	}
+
+
+structmembers: %empty {
+		$$=NULL;
+	}
+| statement_end {
+		$$=NULL;
+	}
+| structmembers structmember statement_end {
+		if ($1) {
+			$$=$1;
+			ast_add_sibling($$, $2);
+		} else {
+			$$=$2;
+		}
+	}
+
+
+structmember: TOKEN_VAR TOKEN_STR array_dereference {
+		$$=ast_new_node(AST_TYPE_STRUCTMEMBER, &@$);
+		$$->size=1;
+		$$->name=strdup($2);
+		if ($3) {
+			$$->children=$3;
+			$$->returns=$3->returns;
+		} else {
+			$$->returns=AST_RETURNS_NUMBER;
+		}
+	}
+| TOKEN_STR TOKEN_STR array_dereference {
+		$$=ast_new_node(AST_TYPE_STRUCTMEMBER, &@$);
+		$$->size=1;
+		$$->name=strdup($2);
+		ast_node_t *a=ast_new_node(AST_TYPE_STRUCTREF, &@$);
+		a->name=strdup($1);
+		if ($3) {
+			//Need to insert the struct at the end of the array chain
+			ast_node_t *n=ast_find_deepest_arrayref($3);
+			ast_add_child(n, a);
+			ast_add_child($$, $3);
+			$$->returns=$3->returns;
+		} else {
+			ast_add_child($$, a);
+			$$->returns=AST_RETURNS_OBJ;
+		}
+	}
 
 
 stdaloneexpr: expr {
@@ -162,25 +219,43 @@ for_statement: TOKEN_FOR TOKEN_LPAREN statement TOKEN_SEMICOLON expr TOKEN_SEMIC
 		ast_add_child($$, $9);
 	}
 
-assignment: TOKEN_STR TOKEN_ASSIGN expr {
+assignment: TOKEN_STR dereference TOKEN_ASSIGN expr {
 		$$=ast_new_node(AST_TYPE_ASSIGN, &@$);
 		$$->name=strdup($1);
-		ast_add_child($$, $3);
+		ast_add_child($$, $2);
+		ast_add_child($$, $4);
 	}
-| TOKEN_STR TOKEN_SQBOPEN expr TOKEN_SQBCLOSE TOKEN_ASSIGN expr {
-		$$=ast_new_node(AST_TYPE_ASSIGN_ARRAY_MEMBER, &@$);
-		$$->name=strdup($1);
-		ast_add_child($$, $3);
-		ast_add_child($$, $6);
-}
 
-vardef: TOKEN_VAR TOKEN_STR {
+vardef: TOKEN_VAR TOKEN_STR array_dereference {
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->size=1;
 		$$->name=strdup($2);
-		$$->returns=AST_RETURNS_NUMBER;
+		if ($3) {
+			$$->children=$3;
+			$$->returns=$3->returns;
+		} else {
+			$$->returns=AST_RETURNS_NUMBER;
+		}
+	}
+| TOKEN_STR TOKEN_STR array_dereference {
+		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
+		$$->size=1;
+		$$->name=strdup($2);
+		ast_node_t *a=ast_new_node(AST_TYPE_STRUCTREF, &@$);
+		a->name=strdup($1);
+		if ($3) {
+			//Need to insert the struct at the end of the array chain
+			ast_node_t *n=ast_find_deepest_arrayref($3);
+			ast_add_child(n, a);
+			ast_add_child($$, $3);
+			$$->returns=$3->returns;
+		} else {
+			ast_add_child($$, a);
+			$$->returns=AST_RETURNS_OBJ;
+		}
 	}
 | TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
+		//ToDo: what if non-pod assignment?
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->name=strdup($2);
 		$$->size=1;
@@ -191,16 +266,47 @@ vardef: TOKEN_VAR TOKEN_STR {
 		ast_add_child($$, a);
 		ast_add_child(a, $4);
 	}
-| TOKEN_VAR TOKEN_STR TOKEN_SQBOPEN expr TOKEN_SQBCLOSE {
-		if ($4->returns!=AST_RETURNS_CONST) {
-			yyerror(&@$, program, scanner, "Array size cannot be variable");
-			YYERROR;
+
+dereference: %empty {
+		$$=NULL;
+	}
+| dereference TOKEN_SQBOPEN expr TOKEN_SQBCLOSE {
+		ast_node_t *a=ast_new_node(AST_TYPE_ARRAYREF, &@$);
+		ast_add_child(a, $3);
+		if ($1) {
+			ast_add_child(ast_find_deepest_ref($1), a);
+			$$=$1;
+		} else {
+			$$=a;
 		}
-		$$=ast_new_node(AST_TYPE_DECLARE_ARRAY, &@$);
-		$$->name=strdup($2);
-		ast_add_child($$, $4);
-		$$->returns=AST_RETURNS_ARRAY;
-}
+	}
+| dereference TOKEN_PERIOD TOKEN_STR {
+		ast_node_t *a=ast_new_node(AST_TYPE_STRUCTMEMBER, &@$);
+		a->name=strdup($3);
+		if ($1) {
+			ast_add_child(ast_find_deepest_ref($1), a);
+			$$=$1;
+		} else {
+			$$=a;
+		}
+	}
+
+//var j=y[2].e[1].member;
+
+array_dereference: %empty{
+		$$=NULL;
+	}
+| array_dereference TOKEN_SQBOPEN expr TOKEN_SQBCLOSE {
+		ast_node_t *a=ast_new_node(AST_TYPE_ARRAYREF, &@$);
+		ast_add_child(a, $3);
+		if ($1) {
+			ast_add_child($1, a);
+			$$=$1;
+		} else {
+			$$=a;
+		}
+	}
+
 
 return_statement: TOKEN_RETURN {
 		$$=ast_new_node(AST_TYPE_RETURN, &@$);
@@ -234,44 +340,46 @@ br_term: term
 		$$=$2;
 	}
 
+
+var_deref: TOKEN_STR dereference {
+		$$=ast_new_node(AST_TYPE_DEREF, &@$);
+		$$->name=strdup($1);
+		if ($2) ast_add_child($$, $2);
+		$$->returns=AST_RETURNS_NUMBER; //...we hope
+	}
+
 term: TOKEN_NUMBER { 
 		$$=ast_new_node(AST_TYPE_NUMBER, &@$);
 		$$->number=$1;
 		$$->returns=AST_RETURNS_CONST;
 	 }
-| TOKEN_STR TOKEN_SQBOPEN expr TOKEN_SQBCLOSE {
-		$$=ast_new_node(AST_TYPE_ARRAY_DEREF, &@$);
-		$$->name=strdup($1);
-		ast_add_child($$, $3);
-		$$->returns=AST_RETURNS_NUMBER;
-	}
-| TOKEN_STR { 
-		$$=ast_new_node(AST_TYPE_VAR, &@$);
-		$$->name=strdup($1);
-		$$->returns=AST_RETURNS_NUMBER;
-	}
-| TOKEN_STR TOKEN_PLUSPLUS {
+| var_deref
+| var_deref TOKEN_PLUSPLUS {
 		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);
 		$$->name=strdup($1);
 		$$->number=(1<<16);
+		ast_add_child($$, $1);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
-| TOKEN_STR TOKEN_MINUSMINUS {
+| var_deref TOKEN_MINUSMINUS {
 		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);
 		$$->name=strdup($1);
 		$$->number=-(1<<16);
+		ast_add_child($$, $1);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
-| TOKEN_PLUSPLUS TOKEN_STR {
+| TOKEN_PLUSPLUS var_deref  {
 		$$=ast_new_node(AST_TYPE_PRE_ADD, &@$);
 		$$->name=strdup($2);
 		$$->number=(1<<16);
+		ast_add_child($$, $2);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
-| TOKEN_MINUSMINUS TOKEN_STR {
+| TOKEN_MINUSMINUS var_deref  {
 		$$=ast_new_node(AST_TYPE_PRE_ADD, &@$);
 		$$->name=strdup($2);
 		$$->number=-(1<<16);
+		ast_add_child($$, $2);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
 | func_call

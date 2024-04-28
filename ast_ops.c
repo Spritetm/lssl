@@ -13,11 +13,99 @@
 /*
 Urgh, non-POD variables.
 
-We store the entire thing on the stack?
-- Pointer to data
-- Data [size, elements]
+Redo The Idea Of Non-POD.
+A var is a 32-bit 16.16 fixed point number.
+A non-POD is a 32-bit number, divided into 2 fields:
+- Pointer to the data
+- Size of the data.
+Because the compiler always knows the data type of a non-POD, it can
+resolve any dereference.
 
-Needs initialization. Pointer needs to point to data. Possibly initialization is needed.
+There are two basic non-POD building blocks for now:
+* 1-d arrays
+* Structures.
+
+These can be mixed: you can have an 1-d array of struct containing an 1-d 
+array of 1-d arrays etc.
+
+Dereferencing a pointer or struct actually results in one of two things:
+- A pointer to the resulting non-POD, or
+- The value of the POD.
+
+For instance:
+struct rgb {
+	var r;
+	var g;
+	var b;
+};
+
+struct led {
+	rgb colors[3];
+	var pos;
+}
+
+led leds[20];
+
+x=leds[3].colors[1].b
+
+(leds)
+push address_of_leds;
+rd_var
+([3])
+push 3
+arr_rel_idx sizeof(led) //rel_idx s:   pop ptr, pop ct, ptr.addr+=ct*s; ptr.size=s; push ptr
+(.colors)
+push 0;
+struct_off sizeof(rgb*3) //struct_off s: pop ptr, pop idx, ptr.addr+=idx, ptr.size=s; push ptr
+([1])
+push 1;
+arr_rel_idx sizeof(rgb)
+(.r)
+push 2
+struct_off sizeof(var);
+(finally, dereference to pod)
+deref					// pop ptr; assert ptr.size==1; push mem[ptr.addr]
+
+
+struct a_t {
+	var b;
+	var c[1];
+	b_t d;
+	b_t e[2];
+}
+
+structdef
+ - declare {.returns=number}
+ - declare {.returns=array}
+	- arraydef {.number=1}
+ - declare {.returns=struct}
+	- structref {.value=node(a_t)}
+ - declare {.returns=struct_array}
+	- arraydef {.number=2}
+	- structref {.value=node(a,t)}
+
+var u
+declare {.returns=number, .size=1;}
+var v[2];
+declare {.returns=obj}
+ - arraydef {.number=2}
+var w[2][3];
+declare {.returns=obj}
+ - arraydef 
+  - number {3}
+  - arraydef {.number=3}
+a_t x;
+declare {.returns=obj}
+ - structdef {.value=node(a_t)}
+
+a_t y[3]:
+declare {.returns=obj}
+ - arraydef {}
+  - number(3)
+  - structref {.value=node(a_t)}
+
+
+
 
 */
 
@@ -94,8 +182,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 			add_sym(syms, n);
 		} else if (n->type==AST_TYPE_FUNCDEFARG) {
 			add_sym(syms, n);
-		} else if (n->type==AST_TYPE_ASSIGN_ARRAY_MEMBER ||
-					n->type==AST_TYPE_ARRAY_DEREF) {
+		} else if (n->type==AST_TYPE_ASSIGN_ARRAY_MEMBER) {
 			if (is_global) {
 				panic_error(n, "Array dereference on global level: %s", n->name);
 				return;
@@ -111,7 +198,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 				return;
 			}
 			n->value=s;
-		} else if (n->type==AST_TYPE_VAR || 
+		} else if (n->type==AST_TYPE_DEREF || 
 					n->type==AST_TYPE_ASSIGN ||
 					n->type==AST_TYPE_POST_ADD ||
 					n->type==AST_TYPE_PRE_ADD
@@ -197,7 +284,7 @@ void ast_ops_add_trailing_return(ast_node_t *node) {
 }
 
 
-//Recursively goes through ast to attach symbols
+//Recursively goes through ast to attach symbol definitions
 void ast_ops_attach_symbol_defs(ast_node_t *node) {
 	ast_sym_list_t *syms=calloc(sizeof(ast_sym_list_t), 1);
 	syms->size=1024;
@@ -310,6 +397,85 @@ void ast_ops_remove_useless_ops(ast_node_t *node) {
 			}
 		}
 		if (n->children) ast_ops_remove_useless_ops(n->children);
+	}
+}
+
+
+static void assoc_structrefs(ast_node_t *root, ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_STRUCTREF) {
+			//Find associated structdef
+			for (ast_node_t *m=root; m!=NULL; m=m->sibling) {
+				if (m->type==AST_TYPE_STRUCTDEF && strcmp(m->name, n->name)==0) {
+					n->value=m;
+					break;
+				}
+			}
+			if (n->value==NULL) {
+				panic_error(n, "Undefined struct type %s", n->name);
+			}
+		}
+		if (n->children) assoc_structrefs(root, n->children);
+	}
+}
+
+void ast_ops_assoc_structrefs(ast_node_t *node) {
+	//Note: Structdefs are only allowed on the top level.
+	assoc_structrefs(node, node);
+}
+
+
+void annotate_deref_datatype(ast_node_t *node, ast_node_t *typepos) {
+	if (!node) return;
+	if (!typepos) return;
+	ast_node_t *r, *t;
+	r=ast_find_type(node->children, AST_TYPE_ARRAYREF);
+	t=ast_find_type(typepos->children, AST_TYPE_ARRAYREF);
+	if (r && t) {
+		ast_node_t *a=ast_new_node(AST_TYPE_DATATYPE, &node->loc);
+		a->value=t;
+		a->sibling=node->children;
+		node->children=a;
+		annotate_deref_datatype(r, t);
+		return;
+	} else if (r) {
+		panic_error(r, "Cannot dereference this; not an array");
+		return;
+	}
+	r=ast_find_type(node->children, AST_TYPE_STRUCTMEMBER);
+	t=ast_find_type(typepos->children, AST_TYPE_STRUCTREF);
+	if (r && t) {
+		ast_node_t *a=ast_new_node(AST_TYPE_DATATYPE, &node->loc);
+		a->value=t->value; //the STRUCTDEF associated with the STRUCTREF
+		//find the structmember node associated
+		ast_node_t *structmember=t->value->children;
+		while (structmember!=NULL && strcmp(structmember->name, r->name)!=0) {
+			structmember=structmember->sibling;
+		}
+		if (structmember) {
+			annotate_deref_datatype(r, structmember);
+		} else {
+			panic_error(r, "No such member in struct: %s", r->name);
+		}
+		return;
+	} else if (r) {
+		panic_error(r, "Getting member on something that is not a struct");
+		return;
+	}
+
+	//Probably a POD.
+	return;
+}
+
+//Add datatype node to non-POD derefs
+//effectively for each part of a deref, it attaches a node indicating the
+//type of what is returned.
+void ast_ops_annotate_datatype(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_DEREF) {
+			annotate_deref_datatype(node, node->value);
+		}
+		if (n->children) ast_ops_annotate_datatype(n->children);
 	}
 }
 
@@ -517,10 +683,11 @@ uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 //Calls all ops (except binary generation) in the proper order
 void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_fix_parents(prognode);
+	ast_ops_assoc_structrefs(prognode);
 	ast_ops_add_program_start(prognode, "main");
 	ast_ops_collate_consts(prognode);
-	ast_ops_add_size_to_array_defs(prognode);
 	ast_ops_attach_symbol_defs(prognode);
+	ast_ops_annotate_datatype(prognode);
 	ast_ops_fix_parents(prognode);
 	ast_ops_add_trailing_return(prognode);
 	ast_ops_fix_parents(prognode);
