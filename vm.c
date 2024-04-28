@@ -104,6 +104,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			push(vm, arg<<16);
 		} else if (op==INSN_PUSH_R) {
 			push(vm, arg);
+/*
 		} else if (op==INSN_RD_VAR) {
 			push(vm, vm->stack[vm->bp+arg]);
 		} else if (op==INSN_WR_VAR) {
@@ -112,6 +113,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			push(vm, vm->stack[arg]);
 		} else if (op==INSN_WR_G_VAR) {
 			vm->stack[arg]=pop(vm);
+*/
 		} else if (op==INSN_MUL) {
 			int32_t a=pop(vm);
 			int32_t b=pop(vm);
@@ -202,6 +204,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			vm->stack[addr]=addr+1;
 			vm->stack[addr+1]=size;
 			for (int i=0; i<size; i++) vm->stack[addr+2+i]=0;
+/*
 		} else if (op==INSN_RD_ARR || op==INSN_RD_G_ARR) {
 			int pos=pop(vm)>>16;
 			int addr=(op==INSN_RD_ARR)?vm->bp+arg:arg;
@@ -225,6 +228,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			} else {
 				vm->stack[data_addr+1+pos]=val;
 			}
+*/
 		} else {
 			printf("Unknown op %d @ pc 0x%x\n", op, vm->pc);
 			vm->error=LSSL_VM_ERR_UNK_OP;

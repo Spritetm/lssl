@@ -175,48 +175,8 @@ static void codegen_node(ast_node_t *n) {
 		insert_insn_after_arg_eval(n, INSN_WR_VAR, 2);
 	} else if (n->type==AST_TYPE_POST_ADD || n->type==AST_TYPE_PRE_ADD) {
 		codegen_node(nth_param(n, 1));
-		insert_insn_after_arg_eval(n, INSN_DUP, 1);
-		insert_insn_after_arg_eval(n, INSN_DEREF, 1);
-		if (n->type==AST_TYPE_POST_ADD) insert_insn_after_arg_eval(n, INSN_DUP, 1);
-		//preadd: adr, val; postadd: adr, val, val
-		ast_node_t *j;
-		if (n->number&0xffff) {
-			j=insert_insn_after_arg_eval(n, INSN_PUSH_I, 1);
-			j->insn_arg=n->number>>16;
-		} else {
-			j=insert_insn_after_arg_eval(n, INSN_PUSH_R, 1);
-			j->insn_arg=n->number;
-		}
-		insert_insn_after_arg_eval(n, INSN_ADD, );
-		if (n->type==AST_TYPE_PRE_ADD) insert_insn_after_arg_eval(n, INSN_DUP, 1);
-		//preadd: adr, val+n, val+n; postadd: adr, val, val+n
-		insert_insn_after_arg_eval(n, INSN_DIG, 1);
-		j->insn_arg=1;
-		//preadd: adr, val+n, val+n, val+n; postadd: adr, val, val+n, val
-		
-		//Urgh, this is a PITA because the address/val/val+n are in the wrong
-		//place...
-		//ToDo: 
-		// make DIG instruction to grab var at (pc-x) and push it.
-		// make POP take an argument: amount of pos popped?
-
-		
-		
-		ast_node_t *i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_RD_VAR:INSN_RD_G_VAR);
-		i->value=n->value;
-		if (n->type==AST_TYPE_POST_ADD) insert_insn_before_arg_eval(n, INSN_DUP);
-		ast_node_t *j;
-		if (n->number&0xffff) {
-			j=insert_insn_before_arg_eval(n, INSN_PUSH_I);
-			j->insn_arg=n->number>>16;
-		} else {
-			j=insert_insn_before_arg_eval(n, INSN_PUSH_R);
-			j->insn_arg=n->number;
-		}
-		insert_insn_before_arg_eval(n, INSN_ADD);
-		if (n->type==AST_TYPE_PRE_ADD) insert_insn_before_arg_eval(n, INSN_DUP);
-		ast_node_t *k=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_WR_VAR:INSN_WR_G_VAR);
-		k->value=n->value;
+		ast_node_t *i=insert_insn_after_arg_eval(n, n->type==AST_TYPE_POST_ADD?INSN_POST_ADD:INSN_PRE_ADD, 1);
+		i->insn_arg=n->number>>16;
 	} else if (n->type==AST_TYPE_RETURN) {
 		codegen_node(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_LEAVE, 1);
@@ -247,14 +207,17 @@ static void codegen_node(ast_node_t *n) {
 		ast_node_t *k=insert_insn_before_arg_eval(n, (n->parent)?INSN_ARRAYINIT:INSN_ARRAYINIT_G);
 		k->value=n;
 	} else if (n->type==AST_TYPE_ARRAYREF) {
+/*
 		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
 			panic_error(n, "Eek! Array index isn't a number!");
 			return;
 		}
 		codegen_node(n->children);
-//		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_RD_ARR:INSN_RD_G_ARR, 1);
-//		i->value=n->value;
+		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_RD_ARR:INSN_RD_G_ARR, 1);
+		i->value=n->value;
+*/
 	} else if (n->type==AST_TYPE_ASSIGN_ARRAY_MEMBER) {
+/*
 		if (!(n->children->returns==AST_RETURNS_NUMBER || n->children->returns==AST_RETURNS_CONST)) {
 			panic_error(n, "Eek! Array index isn't a number!");
 			return;
@@ -267,6 +230,7 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 2)); //value
 		ast_node_t *i=insert_insn_after_arg_eval(n, (n->value->parent)?INSN_WR_ARR:INSN_WR_G_ARR, 2);
 		i->value=n->value;
+*/
 	} else if (n->type==AST_TYPE_STRUCTDEF) {
 		//nothing
 	} else if (n->type==AST_TYPE_STRUCTREF) {

@@ -54,6 +54,8 @@
 	LSSL_INS_ENTRY(LEA, ARG_VAR) \
 	LSSL_INS_ENTRY(LEA_G, ARG_VAR) \
 	LSSL_INS_ENTRY(DEREF, ARG_VAR) \
+	LSSL_INS_ENTRY(PRE_ADD, ARG_REAL) \
+	LSSL_INS_ENTRY(POST_ADD, ARG_REAL) \
 
 
 typedef enum lssl_argtype_enum lssl_argtype_enum;

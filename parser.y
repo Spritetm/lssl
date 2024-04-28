@@ -71,7 +71,7 @@ while (0)
 %type<ast> vardef expr compf factor br_term term func_call funccallargs
 %type<ast> funcdefarg return_statement 
 %type<ast> structdef structmembers structmember 
-%type<ast> dereference array_dereference
+%type<ast> dereference array_dereference var_deref
 
 %%
 
@@ -356,28 +356,24 @@ term: TOKEN_NUMBER {
 | var_deref
 | var_deref TOKEN_PLUSPLUS {
 		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);
-		$$->name=strdup($1);
 		$$->number=(1<<16);
 		ast_add_child($$, $1);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
 | var_deref TOKEN_MINUSMINUS {
 		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);
-		$$->name=strdup($1);
 		$$->number=-(1<<16);
 		ast_add_child($$, $1);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
 | TOKEN_PLUSPLUS var_deref  {
 		$$=ast_new_node(AST_TYPE_PRE_ADD, &@$);
-		$$->name=strdup($2);
 		$$->number=(1<<16);
 		ast_add_child($$, $2);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
 | TOKEN_MINUSMINUS var_deref  {
 		$$=ast_new_node(AST_TYPE_PRE_ADD, &@$);
-		$$->name=strdup($2);
 		$$->number=-(1<<16);
 		ast_add_child($$, $2);
 		$$->returns=AST_RETURNS_NUMBER;
