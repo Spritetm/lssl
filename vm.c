@@ -12,6 +12,7 @@ struct lssl_vm_t {
 	int stack_size;
 	int bp;
 	int sp;
+	int ap;
 	int pc;
 	int error;
 };
@@ -66,6 +67,8 @@ fn1 return PC
 local var A
 local var B
 allocated array/struct C
+<--- AP
+allocated array/struct D in restricted scope
 <--- SP
 
 */
@@ -102,6 +105,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 	push(vm, -1); //fake return address
 	vm->pc=fn_handle;
 	vm->bp=vm->sp;
+	vm->ap=vm->sp;
 	vm->error=0;
 	while(vm->error==LSSL_VM_ERR_NONE) {
 		int new_pc=vm->pc;
@@ -214,6 +218,12 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 			int32_t v=pop(vm);
 			push(vm, v);
 			push(vm, v);
+		} else if (op==INSN_SCOPE_ENTER) {
+			push(vm, vm->ap);
+			vm->ap=vm->sp;
+		} else if (op==INSN_SCOPE_LEAVE) {
+			vm->sp=vm->ap;
+			vm->ap=pop(vm);
 		} else {
 			printf("Unknown op %d @ pc 0x%x\n", op, vm->pc);
 			vm->error=LSSL_VM_ERR_UNK_OP;

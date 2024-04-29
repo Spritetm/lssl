@@ -168,7 +168,7 @@ structmember: TOKEN_VAR TOKEN_STR array_dereference {
 			$$->returns=$3->returns;
 		} else {
 			ast_add_child($$, a);
-			$$->returns=AST_RETURNS_OBJ;
+			$$->returns=AST_RETURNS_STRUCT;
 		}
 	}
 
@@ -250,7 +250,7 @@ vardef: TOKEN_VAR TOKEN_STR array_dereference {
 			$$->returns=$3->returns;
 		} else {
 			ast_add_child($$, a);
-			$$->returns=AST_RETURNS_OBJ;
+			$$->returns=AST_RETURNS_STRUCT;
 		}
 	}
 | TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {

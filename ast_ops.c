@@ -178,26 +178,8 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 		//Add local vars to list of syms.
 		if (n->type==AST_TYPE_DECLARE) {
 			add_sym(syms, n);
-		} else if (n->type==AST_TYPE_DECLARE_ARRAY) {
-			add_sym(syms, n);
 		} else if (n->type==AST_TYPE_FUNCDEFARG) {
 			add_sym(syms, n);
-		} else if (n->type==AST_TYPE_ASSIGN_ARRAY_MEMBER) {
-			if (is_global) {
-				panic_error(n, "Array dereference on global level: %s", n->name);
-				return;
-			}
-			//Find variable symbol and resolve
-			ast_node_t *s=find_symbol(syms, n->name);
-			if (!s) {
-				panic_error(n, "Undefined array %s", n->name);
-				return;
-			}
-			if (s->type!=AST_TYPE_DECLARE_ARRAY) {
-				panic_error(n, "Cannot dereference non-array %s", n->name);
-				return;
-			}
-			n->value=s;
 		} else if (n->type==AST_TYPE_DEREF || 
 					n->type==AST_TYPE_REF ||
 					n->type==AST_TYPE_POST_ADD ||
@@ -336,7 +318,7 @@ static int block_place_locals(ast_node_t * node, int start_pos) {
 	//Give position to local vars. Also adds size of locals (but not subblocks) to `pos`.
 	int pos=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DECLARE || n->type==AST_TYPE_DECLARE_ARRAY) {
+		if (n->type==AST_TYPE_DECLARE) {
 			n->valpos=start_pos+pos;
 			pos+=n->size;
 		}
@@ -397,6 +379,7 @@ void ast_ops_remove_useless_ops(ast_node_t *node) {
 }
 
 
+//Associate STRUCTREF to STRUCTDEF node
 static void assoc_structrefs(ast_node_t *root, ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_STRUCTREF) {
@@ -416,7 +399,6 @@ static void assoc_structrefs(ast_node_t *root, ast_node_t *node) {
 }
 
 void ast_ops_assoc_structrefs(ast_node_t *node) {
-	//Note: Structdefs are only allowed on the top level.
 	assoc_structrefs(node, node);
 }
 
@@ -626,7 +608,7 @@ static int globals_size(ast_node_t *node) {
 	//Find globals first.
 	int glob_size=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DECLARE || n->type==AST_TYPE_DECLARE_ARRAY) {
+		if (n->type==AST_TYPE_DECLARE) {
 			glob_size+=n->size;
 		}
 	}
@@ -647,17 +629,6 @@ void ast_ops_add_program_start(ast_node_t *node, const char *main_fn_name) {
 	printf("Warning: no function '%s' found. Using first function defined instead.\n", main_fn_name);
 }
 
-void ast_ops_add_size_to_array_defs(ast_node_t *node) {
-	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DECLARE_ARRAY) {
-			if (n->children->type!=AST_TYPE_NUMBER || n->children->returns!=AST_RETURNS_CONST) {
-				panic_error(n, "Array declaration must have const number of elements: %s", n->name);
-			}
-			n->size=(n->children->number>>16)+2; //extra 2 positions for address and size
-		}
-		if (n->children) ast_ops_add_size_to_array_defs(n->children);
-	}
-}
 
 static int size_of_obj(ast_node_t *node) {
 	int ret=0;
@@ -692,61 +663,53 @@ static int size_of_obj(ast_node_t *node) {
 		}
 	} else if (node->type==AST_TYPE_STRUCTREF) {
 		ret=size_of_obj(node->value); //the structdef
+	} else {
+		ret=1; //probably POD
 	}
 	return ret;
 }
 
-static void convert_local_declare_to_init(ast_node_t *node) {
+//Also annotates return type
+void ast_ops_annotate_obj_size(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DECLARE) {
-			ast_node_t *a=ast_find_type(n->children, AST_TYPE_ARRAYREF);
+		if (n->type==AST_TYPE_ARRAYREF) {
+			n->parent->returns=AST_RETURNS_ARRAY;
+			//this will get overwritten when we search deeper, if needed
+			n->returns=AST_RETURNS_NUMBER;
+			ast_node_t *a=ast_find_type(node->children, AST_TYPE_ARRAYREF);
+			if (!a) a=ast_find_type(node->children, AST_TYPE_STRUCTREF);
 			if (a) {
-				n->type=AST_TYPE_ARRAY_INIT;
-				n->size=size_of_obj(a->children);
-			}
-			ast_node_t *s=ast_find_type(n->children, AST_TYPE_STRUCTREF);
-			if (s) {
-				n->type=AST_TYPE_STRUCT_INIT;
-				n->size=size_of_obj(s);
+				n->size=size_of_obj(a);
+			} else {
+				n->size=1;
 			}
 		}
+		if (n->type==AST_TYPE_STRUCTREF) {
+			n->parent->returns=AST_RETURNS_STRUCT;
+			//this will get overwritten when we search deeper, if needed
+			n->returns=AST_RETURNS_NUMBER;
+			n->size=size_of_obj(n);
+		}
+		ast_ops_annotate_obj_size(n->children);
 	}
 }
+
 
 void ast_ops_add_obj_initializers(ast_node_t *node) {
 	//On the global level, we want to collect all initializers and put them at the very
 	//start of the program.
+	ast_node_t *prev=NULL;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_DECLARE) {
-			ast_node_t *a=ast_find_type(n->children, AST_TYPE_ARRAYREF);
-			if (a) {
-				ast_node_t *i=ast_new_node(AST_TYPE_ARRAY_INIT, &node->loc);
-				//Do some surgery: move the size argument from the arrayref to the
-				//obj_init node.
-				//Assumes the size argument always is the 1st arg in the arrayref.
-				i->children=a->children;
-				a->children=a->children->sibling;
-				i->size=size_of_obj(a->children);
-				i->children->sibling=NULL;
-				i->value=n;
-				//insert at top of program
-				i->sibling=node->sibling;
-				node->sibling=i;
-			}
-			ast_node_t *s=ast_find_type(n->children, AST_TYPE_STRUCTREF);
-			if (s) {
-				ast_node_t *i=ast_new_node(AST_TYPE_STRUCT_INIT, &node->loc);
-				i->size=size_of_obj(s);
-				i->value=n;
-				//insert at top of program
-				i->sibling=node->sibling;
-				node->sibling=i;
-			}
+			//Surgery: move to top of program
+			prev->sibling=n->sibling;
+			n->sibling=node->sibling;
+			node->sibling=n;
+			//otherwise we'll loop as n moved
+			n=prev;
 		}
-		//Locally, we convert DECLARE into ARRAY/STRUCT_INITs.
-		if (n->children) {
-			convert_local_declare_to_init(n->children);
-		}
+		//save for next iteration
+		prev=n;
 	}
 }
 
@@ -774,13 +737,12 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_fix_parents(prognode);
 	ast_ops_var_place(prognode);
 	ast_ops_add_obj_initializers(prognode);
-/*
+	ast_ops_annotate_obj_size(prognode);
 	codegen(prognode);
 	ast_ops_fixup_enter_return(prognode);
 	ast_ops_remove_useless_ops(prognode);
 	ast_ops_position_insns(prognode);
 	ast_ops_assign_addr_to_fndef_node(prognode);
 	ast_ops_fixup_addrs(prognode);
-*/
 	ast_dump(prognode);
 }

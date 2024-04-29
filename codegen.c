@@ -163,7 +163,9 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_FUNCCALLARG) {
 		//na
 	} else if (n->type==AST_TYPE_BLOCK) {
+		insert_insn_before_arg_eval(n, INSN_SCOPE_ENTER);
 		codegen(n->children);
+		insert_insn_after_arg_eval(n, INSN_SCOPE_LEAVE, 1);
 	} else if (n->type==AST_TYPE_DROP) {
 		codegen_node(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_POP, 1);
@@ -181,8 +183,25 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_RETURN, 1);
 	} else if (n->type==AST_TYPE_DECLARE) {
+		if (n->returns==AST_RETURNS_ARRAY) {
+			ast_node_t *a=ast_find_type(n->children, AST_TYPE_ARRAYREF);
+			assert(a && "No arrayref in returns->array declare?");
+			codegen_node(nth_param(a, 1)); //size of the array, in items
+			ast_node_t *j=insert_insn_after_arg_eval(n, (n->parent)?INSN_LEA:INSN_LEA_G, 1);
+			j->value=n;
+			ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAYINIT, 1);
+			i->insn_arg=a->size;
+		} else if (n->returns==AST_RETURNS_STRUCT) {
+			ast_node_t *s=ast_find_type(n->children, AST_TYPE_STRUCTREF);
+			assert(s && "No structref in returns->struct declare?");
+			ast_node_t *j=insert_insn_before_arg_eval(n, (n->parent)?INSN_LEA:INSN_LEA_G);
+			j->value=n;
+			ast_node_t *i=insert_insn_before_arg_eval(n, INSN_STRUCTINIT);
+			i->insn_arg=s->size;
+		}
 		//could have an assign as child
-		if (n->children) codegen_node(nth_param(n, 1));
+		ast_node_t *assign=ast_find_type(n->children, AST_TYPE_ASSIGN);
+		if (assign) codegen_node(assign);
 	} else if (n->type==AST_TYPE_LOCALSIZE) {
 		//na, enter is resolved elsewhere
 	} else if (n->type==AST_TYPE_INSN) {
@@ -199,12 +218,6 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_GOTO) {
 		ast_node_t *j=insert_insn_before_arg_eval(n, INSN_JMP);
 		j->value=n->value;
-	} else if (n->type==AST_TYPE_DECLARE_ARRAY) {
-		//array needs initialization
-		ast_node_t *j=insert_insn_before_arg_eval(n, INSN_PUSH_I);
-		j->insn_arg=n->size;
-		ast_node_t *k=insert_insn_before_arg_eval(n, (n->parent)?INSN_ARRAYINIT:INSN_ARRAYINIT_G);
-		k->value=n;
 	} else if (n->type==AST_TYPE_STRUCTDEF) {
 		//nothing
 	} else if (n->type==AST_TYPE_STRUCTREF) {
@@ -228,9 +241,11 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_ARRAYREF) {
 		codegen_node(nth_param(n, 1));
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAY_IDX, 1);
+		i->insn_arg=n->size;
 	} else if (n->type==AST_TYPE_STRUCTMEMBER) {
 		codegen_node(nth_param(n, 1));
 		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_STRUCT_IDX);
+		i->insn_arg=n->size;
 	} else {
 		panic_error(n, "Eek! Unknown ast type %d\n", n->type);
 	}
