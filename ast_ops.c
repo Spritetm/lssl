@@ -669,10 +669,13 @@ static int size_of_obj(ast_node_t *node) {
 	return ret;
 }
 
+
 //Also annotates return type
-void ast_ops_annotate_obj_size(ast_node_t *node) {
+void ast_ops_annotate_obj_decl_size(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_ARRAYREF) {
+			//This also takes array indices in ref/deref nodes, but we'll
+			//overwrite that later anyway.
 			n->parent->returns=AST_RETURNS_ARRAY;
 			//this will get overwritten when we search deeper, if needed
 			n->returns=AST_RETURNS_NUMBER;
@@ -690,9 +693,66 @@ void ast_ops_annotate_obj_size(ast_node_t *node) {
 			n->returns=AST_RETURNS_NUMBER;
 			n->size=size_of_obj(n);
 		}
-		ast_ops_annotate_obj_size(n->children);
+		if (n->type==AST_TYPE_STRUCTDEF) {
+			for (ast_node_t *i=n->children; i!=0; i=i->sibling) {
+				if (i->type==AST_TYPE_STRUCTMEMBER) {
+					i->size=size_of_obj(i);
+				}
+			}
+		}
+		ast_ops_annotate_obj_decl_size(n->children);
 	}
 }
+
+void annotate_obj_ref_size(ast_node_t *n, ast_node_t *d) {
+	ast_node_t *nt=NULL;
+	if (n->type==AST_TYPE_ARRAYREF) {
+		ast_node_t *a=ast_find_type(d->children, AST_TYPE_ARRAYREF);
+		if (!a) {
+			panic_error(n, "Cannot dereference non-array object");
+		} else {
+			n->size=a->size;
+			n->value=a;
+			nt=a;
+		}
+	} else if (n->type==AST_TYPE_STRUCTMEMBER) {
+		ast_node_t *s=ast_find_type(d->children, AST_TYPE_STRUCTREF);
+		//structref references to a structdef, and we need to select the proper child
+		ast_node_t *m=s->value->children;
+		int off=0;
+		while (m!=NULL && strcmp(m->name, n->name)!=0) {
+			off+=m->size;
+			m=m->sibling;
+		}
+		if (!m) {
+			panic_error(n, "No such member in struct '%s'", s->value->name);
+		} else {
+			n->size=off;
+			n->value=m;
+			nt=m;
+		}
+	}
+	if (nt) {
+		ast_node_t *nn=ast_find_type(n->children, AST_TYPE_STRUCTMEMBER);
+		if (!nn) nn=ast_find_type(n->children, AST_TYPE_ARRAYREF);
+		if (nn) {
+			annotate_obj_ref_size(nn, nt);
+		}
+	}
+}
+
+
+void ast_ops_annotate_obj_ref_size(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_REF || n->type==AST_TYPE_DEREF) {
+			ast_node_t *nn=ast_find_type(n->children, AST_TYPE_STRUCTMEMBER);
+			if (!nn) nn=ast_find_type(n->children, AST_TYPE_ARRAYREF);
+			annotate_obj_ref_size(nn, n->value);
+		}
+		ast_ops_annotate_obj_ref_size(n->children);
+	}
+}
+
 
 
 void ast_ops_add_obj_initializers(ast_node_t *node) {
@@ -737,7 +797,8 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_fix_parents(prognode);
 	ast_ops_var_place(prognode);
 	ast_ops_add_obj_initializers(prognode);
-	ast_ops_annotate_obj_size(prognode);
+	ast_ops_annotate_obj_decl_size(prognode);
+	ast_ops_annotate_obj_ref_size(prognode);
 	codegen(prognode);
 	ast_ops_fixup_enter_return(prognode);
 	ast_ops_remove_useless_ops(prognode);

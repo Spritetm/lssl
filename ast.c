@@ -7,6 +7,7 @@
 #include "ast.h"
 #include "insn.h"
 
+
 static void dump_insn(ast_node_t *node) {
 	assert(node->type==AST_TYPE_INSN);
 	int i=node->insn_type;
@@ -39,6 +40,7 @@ const static char *ast_type_str[]={
 
 //Dumps a node plus its children. Note: NOT its siblings.
 static void dump_node(ast_node_t *node, int depth) {
+	const char *ret_str[]={"unk", "const", "num", "arr", "struct", "fn"};
 	if (node==NULL) {
 		printf("dump_node: NULL node passed\n");
 		return;
@@ -62,10 +64,12 @@ static void dump_node(ast_node_t *node, int depth) {
 	if (node->type==AST_TYPE_FUNCDEFARG) printf(" (position is %d)", node->valpos);
 	if (node->type==AST_TYPE_ARRAYREF) printf(" (size %d)", node->size);
 	if (node->type==AST_TYPE_STRUCTREF) printf(" (size %d)", node->size);
+	if (node->type==AST_TYPE_STRUCTMEMBER) printf(" (offset %d)", node->size);
 	if (node->type==AST_TYPE_INSN) {
 		printf(":\t");
 		dump_insn(node);
 	}
+	if (node->returns) printf(" (ret=%s)", ret_str[node->returns]);
 	printf("\n");
 	//Dump all children
 	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {

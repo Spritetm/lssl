@@ -220,32 +220,36 @@ static void codegen_node(ast_node_t *n) {
 		j->value=n->value;
 	} else if (n->type==AST_TYPE_STRUCTDEF) {
 		//nothing
+	} else if (n->type==AST_TYPE_DATATYPE) {
+		//n/a
+	} else if (n->type==AST_TYPE_REF || n->type==AST_TYPE_DEREF) {
+		codegen_node(nth_param(n, 1));
+		ast_node_t *i;
+		if (n->value->returns==AST_RETURNS_NUMBER) {
+			i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA_G:INSN_LEA);
+		} else {
+			i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LDA_G:INSN_LDA);
+		}
+		i->value=n->value;
+		if (n->type==AST_TYPE_DEREF) {
+			insert_insn_after_arg_eval(n, INSN_DEREF, 1);
+		}
+	} else if (n->type==AST_TYPE_ARRAYREF) {
+		codegen_node(nth_param(n, 1));
+		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAY_IDX, 1);
+		i->insn_arg=n->size;
+		codegen_node(nth_param(n, 2));
 	} else if (n->type==AST_TYPE_STRUCTREF) {
 		//todo
 	} else if (n->type==AST_TYPE_STRUCTMEMBER) {
 		//note: this can also happen in structdefs but since those aren't codegen'ned this
 		//is never called for such a node.
 		//todo
-	} else if (n->type==AST_TYPE_DEREF) {
-		//Note: deref/ref need to do LEA for POD, RD_VAR (equivalent) for non-POD.
 		codegen_node(nth_param(n, 1));
-		ast_node_t *i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA_G:INSN_LEA);
-		i->value=n->value;
-		insert_insn_after_arg_eval(n, INSN_DEREF, 1);
-	} else if (n->type==AST_TYPE_REF) {
-		codegen_node(nth_param(n, 1));
-		ast_node_t *i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA_G:INSN_LEA);
-		i->value=n->value;
-	} else if (n->type==AST_TYPE_DATATYPE) {
-		//n/a
-	} else if (n->type==AST_TYPE_ARRAYREF) {
-		codegen_node(nth_param(n, 1));
-		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAY_IDX, 1);
-		i->insn_arg=n->size;
-	} else if (n->type==AST_TYPE_STRUCTMEMBER) {
-		codegen_node(nth_param(n, 1));
+		ast_node_t *j=insert_insn_before_arg_eval(n, INSN_PUSH_I);
+		j->insn_arg=n->size;
 		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_STRUCT_IDX);
-		i->insn_arg=n->size;
+		i->insn_arg=n->value->size;
 	} else {
 		panic_error(n, "Eek! Unknown ast type %d\n", n->type);
 	}
