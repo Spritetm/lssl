@@ -6,8 +6,7 @@
 #include "error.h"
 
 /*
-Note: This adds instructions to within the AST. This has the downside that 
-we cannot switch e.g. args around compared to the AST.
+Note: This adds instructions to within the AST.
 */
 
 static void codegen_node(ast_node_t *n);
@@ -217,6 +216,8 @@ static void codegen_node(ast_node_t *n) {
 		j->value=n->value;
 	} else if (n->type==AST_TYPE_STRUCTDEF) {
 		//nothing
+	} else if (n->type==AST_TYPE_STRUCTREF) {
+		//n/a
 	} else if (n->type==AST_TYPE_DATATYPE) {
 		//n/a
 	} else if (n->type==AST_TYPE_REF || n->type==AST_TYPE_DEREF) {
@@ -231,8 +232,6 @@ static void codegen_node(ast_node_t *n) {
 		if (n->type==AST_TYPE_DEREF) {
 			insert_insn_after_all_arg_eval(n, INSN_DEREF);
 		}
-	} else if (n->type==AST_TYPE_STRUCTREF) {
-		//n/a
 	} else if (n->type==AST_TYPE_ARRAYREF) {
 		codegen_node(nth_param(n, 1));
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAY_IDX, 1);

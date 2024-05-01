@@ -7,107 +7,8 @@
 #include "vm_syscall.h"
 #include "codegen.h"
 
-//Mental node: definition of 'fixup' is finding a position (e.g. in ram) for a symbol and changing
+//Note: definition of 'fixup' is finding a position (e.g. in ram) for a symbol and changing
 //the instructions to match that.
-
-/*
-Urgh, non-POD variables.
-
-Redo The Idea Of Non-POD.
-A var is a 32-bit 16.16 fixed point number.
-A non-POD is a 32-bit number, divided into 2 fields:
-- Pointer to the data
-- Size of the data.
-Because the compiler always knows the data type of a non-POD, it can
-resolve any dereference.
-
-There are two basic non-POD building blocks for now:
-* 1-d arrays
-* Structures.
-
-These can be mixed: you can have an 1-d array of struct containing an 1-d 
-array of 1-d arrays etc.
-
-Dereferencing a pointer or struct actually results in one of two things:
-- A pointer to the resulting non-POD, or
-- The value of the POD.
-
-For instance:
-struct rgb {
-	var r;
-	var g;
-	var b;
-};
-
-struct led {
-	rgb colors[3];
-	var pos;
-}
-
-led leds[20];
-
-x=leds[3].colors[1].b
-
-(leds)
-push address_of_leds;
-rd_var
-([3])
-push 3
-arr_rel_idx sizeof(led) //rel_idx s:   pop ptr, pop ct, ptr.addr+=ct*s; ptr.size=s; push ptr
-(.colors)
-push 0;
-struct_off sizeof(rgb*3) //struct_off s: pop ptr, pop idx, ptr.addr+=idx, ptr.size=s; push ptr
-([1])
-push 1;
-arr_rel_idx sizeof(rgb)
-(.r)
-push 2
-struct_off sizeof(var);
-(finally, dereference to pod)
-deref					// pop ptr; assert ptr.size==1; push mem[ptr.addr]
-
-
-struct a_t {
-	var b;
-	var c[1];
-	b_t d;
-	b_t e[2];
-}
-
-structdef
- - declare {.returns=number}
- - declare {.returns=array}
-	- arraydef {.number=1}
- - declare {.returns=struct}
-	- structref {.value=node(a_t)}
- - declare {.returns=struct_array}
-	- arraydef {.number=2}
-	- structref {.value=node(a,t)}
-
-var u
-declare {.returns=number, .size=1;}
-var v[2];
-declare {.returns=obj}
- - arraydef {.number=2}
-var w[2][3];
-declare {.returns=obj}
- - arraydef 
-  - number {3}
-  - arraydef {.number=3}
-a_t x;
-declare {.returns=obj}
- - structdef {.value=node(a_t)}
-
-a_t y[3]:
-declare {.returns=obj}
- - arraydef {}
-  - number(3)
-  - structref {.value=node(a_t)}
-
-
-
-
-*/
 
 
 
@@ -786,6 +687,7 @@ uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 
 //Calls all ops (except binary generation) in the proper order
 void ast_ops_do_compile(ast_node_t *prognode) {
+//	ast_dump(prognode); exit(0);
 	ast_ops_fix_parents(prognode);
 	ast_ops_assoc_structrefs(prognode);
 	ast_ops_add_program_start(prognode, "main");

@@ -68,11 +68,11 @@ while (0)
 %type<str> TOKEN_STR
 %type<ast> input input_line statement block funcdef stdaloneexpr
 %type<ast> funcdefargs while_statement if_statement for_statement assignment
-%type<ast> vardef expr compf factor br_term term func_call funccallargs
+%type<ast> expr compf factor br_term term func_call funccallargs
 %type<ast> funcdefarg return_statement 
 %type<ast> structdef structmembers structmember 
 %type<ast> dereference array_dereference var_deref var_ref
-
+%type<ast> vardef vardef_pod vardef_nonpod
 %%
 
 program: input {
@@ -183,20 +183,26 @@ funcdef: TOKEN_FUNCTION TOKEN_STR TOKEN_LPAREN funcdefargs TOKEN_RPAREN TOKEN_CU
 		$$=ast_new_node(AST_TYPE_FUNCDEF, &@$);
 		$$->name=strdup($2);
 		$$->returns=AST_RETURNS_NUMBER; //functions can only return a number for now
-		ast_add_child($$, $4);
+		if ($4) ast_add_child($$, $4);
 		ast_add_child($$, $7);
 	}
 
-funcdefargs: %empty { $$=NULL; }
+funcdefargs: %empty { 
+		$$=NULL; 
+	}
 | funcdefarg
 | funcdefargs TOKEN_COMMA funcdefarg {
-	ast_add_sibling($1, $3);
-	$$=$1;
-}
+		ast_add_sibling($1, $3);
+		$$=$1;
+	}
 
-funcdefarg: TOKEN_STR {
-		$$=ast_new_node(AST_TYPE_FUNCDEFARG, &@$);
-		$$->name=strdup($1);
+funcdefarg: vardef_nonpod {
+		$$=$1;
+		$$->type=AST_TYPE_FUNCDEFARG;
+	}
+| vardef_pod {
+		$$=$1;
+		$$->type=AST_TYPE_FUNCDEFARG;
 	}
 
 while_statement: TOKEN_WHILE TOKEN_LPAREN expr TOKEN_RPAREN input_line {
@@ -225,18 +231,38 @@ assignment: var_ref TOKEN_ASSIGN expr {
 		ast_add_child($$, $3);
 	}
 
-vardef: TOKEN_VAR TOKEN_STR array_dereference {
+vardef: TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
+		//ToDo: what if non-pod assignment?
+		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
+		$$->name=strdup($2);
+		$$->size=1;
+
+		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN, &@$);
+		a->name=strdup($2);
+		a->returns=$4->returns;
+		ast_add_child($$, a);
+		ast_add_child(a, $4);
+	}
+| TOKEN_VAR vardef_pod {
+		$$=$2;
+	}
+| vardef_nonpod {
+		$$=$1;
+	}
+
+vardef_pod: TOKEN_STR array_dereference {
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->size=1;
-		$$->name=strdup($2);
-		if ($3) {
-			$$->children=$3;
-			$$->returns=$3->returns;
+		$$->name=strdup($1);
+		if ($2) {
+			$$->children=$2;
+			$$->returns=$2->returns;
 		} else {
 			$$->returns=AST_RETURNS_NUMBER;
 		}
 	}
-| TOKEN_STR TOKEN_STR array_dereference {
+
+vardef_nonpod: TOKEN_STR TOKEN_STR array_dereference {
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->size=1;
 		$$->name=strdup($2);
@@ -253,19 +279,6 @@ vardef: TOKEN_VAR TOKEN_STR array_dereference {
 			$$->returns=AST_RETURNS_STRUCT;
 		}
 	}
-| TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
-		//ToDo: what if non-pod assignment?
-		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
-		$$->name=strdup($2);
-		$$->size=1;
-
-		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN, &@$);
-		a->name=strdup($2);
-		a->returns=$4->returns;
-		ast_add_child($$, a);
-		ast_add_child(a, $4);
-	}
-
 dereference: %empty {
 		$$=NULL;
 	}
