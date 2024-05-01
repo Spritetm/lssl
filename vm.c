@@ -43,7 +43,7 @@ lssl_vm_t *lssl_vm_init(uint8_t *program, int prog_len, int stack_size_words) {
 	ret->stack_size=stack_size_words;
 	ret->stack=calloc(stack_size_words, sizeof(uint32_t));
 	ret->sp=glob_sz;
-	ret->bp=glob_sz;
+	ret->bp=0;
 	return ret;
 error:
 	if (ret) free(ret->stack);
@@ -96,16 +96,21 @@ static int32_t pop(lssl_vm_t *vm) {
 	return vm->stack[--vm->sp];
 }
 
-int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_t *argv, vm_error_en *error) {
-	int32_t ret=0;
-	//push the arguments
-	for (int i=0; i<argc; i++) push(vm, argv[i]);
-	//fake call
-	push(vm, vm->bp);
-	push(vm, -1); //fake return address
-	vm->pc=fn_handle;
-	vm->bp=vm->sp;
-	vm->ap=vm->sp;
+inline static uint32_t make_addr(int pos, int size) {
+	return (pos<<16)|size;
+}
+
+inline static int pos_from_addr(uint32_t addr) {
+	return (addr>>16);
+}
+
+inline static int size_from_addr(uint32_t addr) {
+	return (addr&0xffff);
+}
+
+//Runs until error, or until we return to address -1.
+int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_en *error) {
+	int32_t ret;
 	vm->error=0;
 	while(vm->error==LSSL_VM_ERR_NONE) {
 		int new_pc=vm->pc;
@@ -224,6 +229,56 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 		} else if (op==INSN_SCOPE_LEAVE) {
 			vm->sp=vm->ap;
 			vm->ap=pop(vm);
+		} else if (op==INSN_LEA) {
+			int addr=vm->bp+arg;
+			push(vm, make_addr(addr, 1));
+		} else if (op==INSN_LEA_G) {
+			int addr=arg;
+			push(vm, make_addr(addr, 1));
+		} else if (op==INSN_LDA) {
+			int addr=vm->bp+arg;
+			push(vm, vm->stack[addr]);
+		} else if (op==INSN_LDA_G) {
+			int addr=arg;
+			push(vm, vm->stack[addr]);
+		} else if (op==INSN_ARRAYINIT) {
+			int count=(pop(vm)>>16);
+			uint32_t addr=pop(vm);
+			//printf("array_init %d to 0x%x\n",pos_from_addr(addr),make_addr(vm->ap, arg*count));
+			vm->stack[pos_from_addr(addr)]=make_addr(vm->ap, arg*count);
+			vm->ap+=count*arg;
+		} else if (op==INSN_STRUCTINIT) {
+			uint32_t addr=pop(vm);
+			vm->stack[pos_from_addr(addr)]=make_addr(vm->ap, arg);
+			vm->ap+=arg;
+		} else if (op==INSN_ARRAY_IDX) {
+			int idx=(pop(vm)>>16);
+			uint32_t addr=pop(vm);
+			//printf("array_idx: addr 0x%X\n", addr);
+			if (idx*arg>size_from_addr(addr)) {
+				printf("Array out of bounds! Idx is %d, size is %d items of %d. PC=0x%X\n", idx, size_from_addr(addr)/arg, size_from_addr(addr), vm->pc);
+				vm->error=LSSL_VM_ERR_ARRAY_OOB;
+			}
+			addr=make_addr(pos_from_addr(addr)+idx*arg, arg);
+			//printf("array_idx: out addr 0x%X\n", addr);
+			push(vm, addr);
+		} else if (op==INSN_STRUCT_IDX) {
+			uint32_t addr=pop(vm);
+			int offset=(pop(vm)>>16);
+			addr=make_addr(pos_from_addr(addr)+offset, arg);
+			//printf("struct_idx: out addr 0x%X\n", addr);
+			push(vm, addr);
+		} else if (op==INSN_WR_VAR) {
+			uint32_t val=pop(vm);
+			uint32_t addr=pop(vm);
+			//printf("wr_var addr %x @ pc %x\n", addr, vm->pc);
+			assert(size_from_addr(addr)==1 && "Huh? WR_VAR to addr with size != 1");
+			vm->stack[pos_from_addr(addr)]=val;
+		} else if (op==INSN_DEREF) {
+			uint32_t addr=pop(vm);
+			//printf("deref addr %x @ pc %x\n", addr, vm->pc);
+			assert(size_from_addr(addr)==1 && "Huh? DEREF to addr with size != 1");
+			push(vm, vm->stack[pos_from_addr(addr)]);
 		} else {
 			printf("Unknown op %d @ pc 0x%x\n", op, vm->pc);
 			vm->error=LSSL_VM_ERR_UNK_OP;
@@ -234,11 +289,28 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 	return ret;
 }
 
+int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_t *argv, vm_error_en *error) {
+	//push the arguments
+	for (int i=0; i<argc; i++) push(vm, argv[i]);
+	//fake call
+	push(vm, vm->bp);
+	push(vm, -1); //fake return address
+	vm->pc=fn_handle;
+	vm->bp=vm->sp;
+	vm->ap=vm->sp;
 
-void lssl_vm_run_main(lssl_vm_t *vm) {
-	vm_error_en error=0;
+	return lssl_vm_run(vm, error);
+}
+
+
+int32_t lssl_vm_run_main(lssl_vm_t *vm, vm_error_en *error) {
 	//Initialization and main start from pos 0.
-	lssl_vm_run_function(vm, 0, 0, NULL, &error);
+	push(vm, vm->bp);
+	push(vm, -1); //fake return address
+	vm->pc=0;
+	vm->bp=vm->sp;
+	vm->ap=vm->sp;
+	return lssl_vm_run(vm, error);
 }
 
 void lssl_vm_free(lssl_vm_t *vm) {

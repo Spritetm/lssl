@@ -747,7 +747,7 @@ void ast_ops_annotate_obj_ref_size(ast_node_t *node) {
 		if (n->type==AST_TYPE_REF || n->type==AST_TYPE_DEREF) {
 			ast_node_t *nn=ast_find_type(n->children, AST_TYPE_STRUCTMEMBER);
 			if (!nn) nn=ast_find_type(n->children, AST_TYPE_ARRAYREF);
-			annotate_obj_ref_size(nn, n->value);
+			if (nn) annotate_obj_ref_size(nn, n->value);
 		}
 		ast_ops_annotate_obj_ref_size(n->children);
 	}

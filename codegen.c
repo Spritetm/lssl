@@ -60,10 +60,7 @@ static ast_node_t *insert_insn_after_arg_eval(ast_node_t *parent, lssl_instr_enu
 		parent->children=n;
 	} else {
 		ast_node_t *l=nth_param(parent, argnum);
-		if (l==NULL) {
-			free(n);
-			return NULL;
-		}
+		assert(l && "insert_insn_after_arg_eval: no nth parameter exists!");
 		//skip over insns
 		while (l->sibling!=NULL && l->sibling->type==AST_TYPE_INSN) l=l->sibling;
 		//insert there
@@ -186,9 +183,9 @@ static void codegen_node(ast_node_t *n) {
 		if (n->returns==AST_RETURNS_ARRAY) {
 			ast_node_t *a=ast_find_type(n->children, AST_TYPE_ARRAYREF);
 			assert(a && "No arrayref in returns->array declare?");
-			codegen_node(nth_param(a, 1)); //size of the array, in items
-			ast_node_t *j=insert_insn_after_arg_eval(n, (n->parent)?INSN_LEA:INSN_LEA_G, 1);
+			ast_node_t *j=insert_insn_before_arg_eval(n, (n->parent)?INSN_LEA:INSN_LEA_G);
 			j->value=n;
+			codegen_node(nth_param(a, 1)); //size of the array, in items
 			ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAYINIT, 1);
 			i->insn_arg=a->size;
 		} else if (n->returns==AST_RETURNS_STRUCT) {
@@ -226,25 +223,24 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 1));
 		ast_node_t *i;
 		if (n->value->returns==AST_RETURNS_NUMBER) {
-			i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA_G:INSN_LEA);
+			i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA:INSN_LEA_G);
 		} else {
-			i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LDA_G:INSN_LDA);
+			i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LDA:INSN_LDA_G);
 		}
 		i->value=n->value;
 		if (n->type==AST_TYPE_DEREF) {
-			insert_insn_after_arg_eval(n, INSN_DEREF, 1);
+			insert_insn_after_all_arg_eval(n, INSN_DEREF);
 		}
+	} else if (n->type==AST_TYPE_STRUCTREF) {
+		//n/a
 	} else if (n->type==AST_TYPE_ARRAYREF) {
 		codegen_node(nth_param(n, 1));
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAY_IDX, 1);
 		i->insn_arg=n->size;
 		codegen_node(nth_param(n, 2));
-	} else if (n->type==AST_TYPE_STRUCTREF) {
-		//todo
 	} else if (n->type==AST_TYPE_STRUCTMEMBER) {
 		//note: this can also happen in structdefs but since those aren't codegen'ned this
 		//is never called for such a node.
-		//todo
 		codegen_node(nth_param(n, 1));
 		ast_node_t *j=insert_insn_before_arg_eval(n, INSN_PUSH_I);
 		j->insn_arg=n->size;

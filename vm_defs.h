@@ -65,8 +65,8 @@
 									"is outside of the size of the original addr.") \
 	LSSL_INS_ENTRY(SCOPE_ENTER, ARG_NONE, "Push AP, set AP=SP") \
 	LSSL_INS_ENTRY(SCOPE_LEAVE, ARG_NONE, "Set SP=AP, pop AP") \
-	LSSL_INS_ENTRY(ARRAYINIT, ARG_ARRAY, "Push no, push size, [arg]=AP, AP+=no*size") \
-	LSSL_INS_ENTRY(STRUCTINIT, ARG_STRUCT, "Push size, [arg]=AP, AP+=size")
+	LSSL_INS_ENTRY(ARRAYINIT, ARG_INT, "Pop addr, pop count, [addr]=[AP, count*arg], AP+=count*arg") \
+	LSSL_INS_ENTRY(STRUCTINIT, ARG_INT, "Pop addr, [addr]=[AP, arg], AP+=arg")
 
 
 typedef enum lssl_argtype_enum lssl_argtype_enum;

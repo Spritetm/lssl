@@ -39,7 +39,8 @@ void recompile(char *code) {
 	yylex_destroy(myscanner);
 
 	vm=lssl_vm_init(program, bin_len, 1024);
-	lssl_vm_run_main(vm);
+	vm_error_en vm_err;
+	lssl_vm_run_main(vm, &vm_err);
 }
 
 uint8_t rgb[3];
