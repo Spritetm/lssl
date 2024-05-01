@@ -412,10 +412,12 @@ func_call: TOKEN_STR TOKEN_LPAREN funccallargs TOKEN_RPAREN {
 
 funccallargs: %empty { $$=NULL; }
 | expr
-| funccallargs TOKEN_COMMA expr {
+| funccallargs TOKEN_COMMA funccallarg {
 	ast_add_sibling($1, $3);
 	$$=$1;
 }
+
+funccallarg: var_ref | expr
 
 
 
