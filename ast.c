@@ -88,11 +88,26 @@ void ast_dump(ast_node_t *node) {
 	printf("dumped\n");
 }
 
+static ast_node_t *last_alloc=NULL;
+
+//This is technically not re-entrant because the ref to last_alloc
 ast_node_t *ast_new_node(ast_type_en type, file_loc_t *loc) {
 	ast_node_t *r=calloc(sizeof(ast_node_t), 1);
 	r->type=type;
+	if (last_alloc) last_alloc->alloc_next=r;
+	last_alloc=r;
 	memcpy(&r->loc, loc, sizeof(file_loc_t));
 	return r;
+}
+
+void ast_free_all(ast_node_t *node) {
+	while (node) {
+		ast_node_t *next=node->alloc_next;
+		if (node==last_alloc) last_alloc=NULL;
+		free(node->name);
+		free(node);
+		node=next;
+	}
 }
 
 ast_node_t *ast_new_node_2chld(ast_type_en type, file_loc_t *loc, ast_node_t *c1, ast_node_t *c2) {

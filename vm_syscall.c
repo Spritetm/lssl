@@ -136,3 +136,12 @@ int32_t vm_syscall(lssl_vm_t *vm, int syscall, int32_t *arg, int argct) {
 	assert(ent->argct==argct && "Invalid arg count for syscall!");
 	return ent->fn(vm, arg, argct);
 }
+
+void vm_syscall_free() {
+	syscall_list_t *l=syscall_list_last;
+	while(l) {
+		syscall_list_t *next=l->next;
+		if (l!=&syscall_list_builtin) free(l);
+		l=next;
+	}
+}

@@ -64,6 +64,12 @@ while (0)
 	ast_node_t *ast;
 }
 
+/*
+Note that TOKEN_STR comes in as memory that is allocated by the lexer, but not
+freed. This means that a TOKEN_STR either needs to be allocated to an ast_node->name
+field (in which the ast_node now owns the memory) or free()ed here.
+*/
+
 %type<number> TOKEN_NUMBER
 %type<str> TOKEN_STR
 %type<ast> input input_line statement block funcdef stdaloneexpr
@@ -123,7 +129,7 @@ statement: %empty {
 
 structdef: TOKEN_STRUCT TOKEN_STR TOKEN_CURLOPEN structmembers TOKEN_CURLCLOSE {
 		$$=ast_new_node(AST_TYPE_STRUCTDEF, &@$);
-		$$->name=strdup($2);
+		$$->name=$2;
 		$$->children=$4;
 	}
 
@@ -147,7 +153,7 @@ structmembers: %empty {
 structmember: TOKEN_VAR TOKEN_STR array_dereference {
 		$$=ast_new_node(AST_TYPE_STRUCTMEMBER, &@$);
 		$$->size=1;
-		$$->name=strdup($2);
+		$$->name=$2;
 		if ($3) {
 			$$->children=$3;
 			$$->returns=$3->returns;
@@ -158,7 +164,7 @@ structmember: TOKEN_VAR TOKEN_STR array_dereference {
 | TOKEN_STR TOKEN_STR array_dereference {
 		$$=ast_new_node(AST_TYPE_STRUCTMEMBER, &@$);
 		$$->size=1;
-		$$->name=strdup($2);
+		$$->name=$2;
 		ast_node_t *a=ast_new_node(AST_TYPE_STRUCTREF, &@$);
 		a->name=strdup($1);
 		if ($3) {
@@ -182,7 +188,7 @@ stdaloneexpr: expr {
 
 funcdef: TOKEN_FUNCTION TOKEN_STR TOKEN_LPAREN funcdefargs TOKEN_RPAREN TOKEN_CURLOPEN input TOKEN_CURLCLOSE {
 		$$=ast_new_node(AST_TYPE_FUNCDEF, &@$);
-		$$->name=strdup($2);
+		$$->name=$2;
 		$$->returns=AST_RETURNS_NUMBER; //functions can only return a number for now
 		if ($4) ast_add_child($$, $4);
 		ast_add_child($$, $7);
@@ -235,7 +241,7 @@ assignment: var_ref TOKEN_ASSIGN expr {
 vardef: TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
 		//ToDo: what if non-pod assignment? (For now, let's not support that.)
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
-		$$->name=strdup($2);
+		$$->name=$2;
 		$$->size=1;
 		$$->returns=AST_RETURNS_NUMBER;
 
@@ -258,7 +264,7 @@ vardef: TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
 vardef_pod: TOKEN_STR array_dereference {
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->size=1;
-		$$->name=strdup($1);
+		$$->name=$1;
 		if ($2) {
 			$$->children=$2;
 			$$->returns=$2->returns;
@@ -272,7 +278,7 @@ vardef_nonpod: TOKEN_STR TOKEN_STR array_dereference {
 		$$->size=1;
 		$$->name=strdup($2);
 		ast_node_t *a=ast_new_node(AST_TYPE_STRUCTREF, &@$);
-		a->name=strdup($1);
+		a->name=$1;
 		if ($3) {
 			//Need to insert the struct at the end of the array chain
 			ast_node_t *n=ast_find_deepest_arrayref($3);
@@ -301,7 +307,7 @@ dereference: %empty {
 	}
 | dereference TOKEN_PERIOD TOKEN_STR {
 		ast_node_t *a=ast_new_node(AST_TYPE_STRUCTMEMBER, &@$);
-		a->name=strdup($3);
+		a->name=$3;
 		if ($1) {
 			ast_add_child(ast_find_deepest_ref($1), a);
 			$$=$1;
@@ -366,7 +372,7 @@ br_term: term
 //var_ref returns an *object pointer* to a variable or struct/arraymember
 var_ref: TOKEN_STR dereference {
 		$$=ast_new_node(AST_TYPE_REF, &@$);
-		$$->name=strdup($1);
+		$$->name=$1;
 		if ($2) ast_add_child($$, $2);
 		$$->returns=AST_RETURNS_NUMBER; //...we hope
 }
@@ -375,7 +381,7 @@ var_ref: TOKEN_STR dereference {
 //var_deref returns the *value* of a variable or struct/arraymember
 var_deref: TOKEN_STR dereference {
 		$$=ast_new_node(AST_TYPE_DEREF, &@$);
-		$$->name=strdup($1);
+		$$->name=$1;
 		if ($2) ast_add_child($$, $2);
 		$$->returns=AST_RETURNS_NUMBER; //...we hope
 	}
@@ -415,7 +421,7 @@ term: TOKEN_NUMBER {
 
 func_call: TOKEN_STR TOKEN_LPAREN funccallargs TOKEN_RPAREN {
 		$$=ast_new_node(AST_TYPE_FUNCCALL, &@$);
-		$$->name=strdup($1);
+		$$->name=$1;
 		ast_add_child($$, $3);
 		$$->returns=AST_RETURNS_NUMBER;
 	}

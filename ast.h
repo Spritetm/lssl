@@ -52,17 +52,17 @@ typedef enum {
 struct ast_node_t {
 	ast_type_en type;
 	ast_returns_t returns;
-	char *name;
+	char *name; //if not NULL, memory here is owned by the node
 	int32_t number;
 	int size;
-	char *str;
 	file_loc_t loc;
 	ast_node_t *value; //e.g. the node for a var def in case of a var ref, of func def for func ref
 	int valpos; //actual location in memory of value
 	ast_node_t *parent;
 	ast_node_t *children;
 	ast_node_t *sibling;
-	lssl_instr_enum insn_type;
+	ast_node_t *alloc_next;
+	lssl_insn_enum insn_type;
 	int insn_arg;
 };
 
@@ -84,6 +84,7 @@ static inline void ast_add_sibling(ast_node_t *t, ast_node_t *n) {
 
 ast_node_t *ast_gen_program_start_node();
 ast_node_t *ast_new_node(ast_type_en type, file_loc_t *loc);
+void ast_free_all(ast_node_t *node);
 ast_node_t *ast_new_node_2chld(ast_type_en type, file_loc_t *loc, ast_node_t *c1, ast_node_t *c2);
 ast_node_t *ast_find_deepest_arrayref(ast_node_t *node);
 ast_node_t *ast_find_deepest_ref(ast_node_t *node);

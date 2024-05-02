@@ -103,9 +103,9 @@ enum lssl_argtype_enum {
 };
 #undef LSSL_ARGTYPE_ENTRY
 
-typedef enum lssl_instr_enum lssl_instr_enum;
+typedef enum lssl_insn_enum lssl_insn_enum;
 #define LSSL_INS_ENTRY(ins, argtype, desc) INSN_##ins,
-enum lssl_instr_enum {
+enum lssl_insn_enum {
 	LSSL_INSTRUCTIONS
 };
 #undef LSSL_INS_ENTRY

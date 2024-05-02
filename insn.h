@@ -6,7 +6,7 @@
 typedef struct insn_t insn_t;
 
 struct insn_t {
-	lssl_instr_enum type;
+	lssl_insn_enum type;
 	int arg;
 	int pos;
 	insn_t *next;

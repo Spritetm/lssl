@@ -12,7 +12,7 @@ Note: This adds instructions to within the AST.
 static void codegen_node(ast_node_t *n);
 
 //Inserts an instruction before the arg nodes, but after the other instructions.
-static ast_node_t *insert_insn_before_arg_eval(ast_node_t *parent, lssl_instr_enum type) {
+static ast_node_t *insert_insn_before_arg_eval(ast_node_t *parent, lssl_insn_enum type) {
 	ast_node_t *n=ast_new_node(AST_TYPE_INSN, &parent->loc);
 	n->insn_type=type;
 	ast_node_t *p=parent->children;
@@ -50,7 +50,7 @@ static ast_node_t *nth_param(ast_node_t *p, int n) {
 
 
 //Inserts an instruction after all args and existing instructions
-static ast_node_t *insert_insn_after_arg_eval(ast_node_t *parent, lssl_instr_enum type, int argnum) {
+static ast_node_t *insert_insn_after_arg_eval(ast_node_t *parent, lssl_insn_enum type, int argnum) {
 	ast_node_t *n=ast_new_node(AST_TYPE_INSN, &parent->loc);
 	n->insn_type=type;
 	if (parent->children==NULL) {
@@ -68,7 +68,7 @@ static ast_node_t *insert_insn_after_arg_eval(ast_node_t *parent, lssl_instr_enu
 	return n;
 }
 
-static ast_node_t *insert_insn_after_all_arg_eval(ast_node_t *parent, lssl_instr_enum type){
+static ast_node_t *insert_insn_after_all_arg_eval(ast_node_t *parent, lssl_insn_enum type){
 	ast_node_t *n=ast_new_node(AST_TYPE_INSN, &parent->loc);
 	n->insn_type=type;
 	if (parent->children==NULL) {
@@ -82,7 +82,7 @@ static ast_node_t *insert_insn_after_all_arg_eval(ast_node_t *parent, lssl_instr
 }
 
 
-void handle_rhs_lhs_op(ast_node_t *node, lssl_instr_enum type) {
+void handle_rhs_lhs_op(ast_node_t *node, lssl_insn_enum type) {
 	codegen_node(nth_param(node, 1));
 	codegen_node(nth_param(node, 2));
 	insert_insn_after_arg_eval(node, type, 2);

@@ -7,6 +7,7 @@ window.addEventListener("load", (event) => {
 	const code = document.querySelector("#code_text");
 	code.addEventListener("keydown", code_keypress);
 	code.addEventListener("keyup", code_keyrelease);
+	code.textContent=localStorage.getItem("code");
 });
 
 
@@ -120,6 +121,8 @@ function code_keyrelease(e) {
 	set_sel_to(code, off);
 	if (compile_timeout===null) clearTimeout(compile_timeout)
 	compile_timeout=setTimeout(recompile_typed, 1000);
+
+	localStorage.setItem("code", code.textContent);
 }
 
 var compile_errors=new Array();

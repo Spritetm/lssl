@@ -6,6 +6,7 @@
 #include "ast_ops.h"
 #include "codegen.h"
 #include "led_syscalls.h"
+#include "vm_syscall.h"
 #include "vm.h"
 
 int main(int argc, char **argv) {
@@ -69,7 +70,7 @@ int main(int argc, char **argv) {
 //    yy_delete_buffer(YY_CURRENT_BUFFER, myscanner);
     yylex_destroy(myscanner);
 
-	uint8_t *bin;
+	uint8_t *bin=NULL;
 	int bin_len;
 	if (strlen(outfile)!=0 || do_run) {
 		bin=ast_ops_gen_binary(prognode, &bin_len);
@@ -85,6 +86,8 @@ int main(int argc, char **argv) {
 		fclose(f);
 	}
 
+	ast_free_all(prognode);
+
 	if (do_run) {
 		printf("Compile done. Running VM code.\n");
 		lssl_vm_t *vm=lssl_vm_init(bin, bin_len, 65536);
@@ -95,6 +98,9 @@ int main(int argc, char **argv) {
 		} else {
 			printf("Ran main() succesfully, returned %f\n", ret/65536.0);
 		}
+		lssl_vm_free(vm);
+		vm_syscall_free();
 	}
 
+	free(bin);
 }
