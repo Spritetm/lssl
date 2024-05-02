@@ -50,7 +50,7 @@ uint8_t *get_led(int pos, float t) {
 		rgb[0]=0; rgb[1]=0; rgb[2]=128;
 		return rgb;
 	}
-	led_syscalls_calculate_led(vm, pos, t);
+	if (!led_syscalls_calculate_led(vm, pos, t)) return NULL;
 	led_syscalls_get_rgb(&rgb[0], &rgb[1], &rgb[2]);
 	return rgb;
 }

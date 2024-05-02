@@ -72,7 +72,8 @@ while (0)
 %type<ast> funcdefarg return_statement 
 %type<ast> structdef structmembers structmember 
 %type<ast> dereference array_dereference var_deref var_ref
-%type<ast> vardef vardef_pod vardef_nonpod
+%type<ast> vardef vardef_pod vardef_nonpod funccallarg
+
 %%
 
 program: input {
@@ -232,16 +233,20 @@ assignment: var_ref TOKEN_ASSIGN expr {
 	}
 
 vardef: TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
-		//ToDo: what if non-pod assignment?
+		//ToDo: what if non-pod assignment? (For now, let's not support that.)
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->name=strdup($2);
 		$$->size=1;
+		$$->returns=AST_RETURNS_NUMBER;
 
 		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN, &@$);
-		a->name=strdup($2);
-		a->returns=$4->returns;
-		ast_add_child($$, a);
+		ast_node_t *r=ast_new_node(AST_TYPE_REF, &@$);
+		r->returns=AST_RETURNS_NUMBER;
+		r->name=strdup($2);
+		ast_add_child(a, r);
 		ast_add_child(a, $4);
+
+		ast_add_child($$, a);
 	}
 | TOKEN_VAR vardef_pod {
 		$$=$2;
@@ -279,6 +284,8 @@ vardef_nonpod: TOKEN_STR TOKEN_STR array_dereference {
 			$$->returns=AST_RETURNS_STRUCT;
 		}
 	}
+
+
 dereference: %empty {
 		$$=NULL;
 	}
@@ -317,6 +324,9 @@ array_dereference: %empty{
 		} else {
 			$$=a;
 		}
+	}
+| array_dereference TOKEN_SQBOPEN TOKEN_SQBCLOSE {
+		$$=ast_new_node(AST_TYPE_ARRAYREF_EMPTY, &@$);
 	}
 
 
@@ -417,7 +427,9 @@ funccallargs: %empty { $$=NULL; }
 	$$=$1;
 }
 
-funccallarg: var_ref | expr
+//Note: this ignores that you can e.g. put an array arg into a function accepting
+//an array. We'll fix that up in ast_ops.c.
+funccallarg: expr
 
 
 

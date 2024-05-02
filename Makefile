@@ -5,7 +5,7 @@ SRC_JS = js_funcs.c
 
 SRC_ALL = $(SRC_BASE) $(SRC_TEST) $(SRC_JS)
 DEPFLAGS = -MT $@ -MMD -MP
--include ($SRC_ALL:.c=.d)
+
 
 CFLAGS=-ggdb -Wall $(DEPFLAGS)
 
@@ -33,3 +33,6 @@ clean:
 	rm -f $(SRC_ALL:.c=.o) 
 	rm -f $(SRC_ALL:.c=.d) 
 	rm -f parser.c parser_gen.h lexer.c lexer_gen.h
+
+
+-include $(SRC_ALL:.c=.d)

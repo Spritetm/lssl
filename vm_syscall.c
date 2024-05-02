@@ -5,8 +5,9 @@
 #include <string.h>
 #include "vm_syscall.h"
 #include "vm_defs.h"
+#include "vm.h"
 
-#define SYSCALL_FUNCTION(name) static int32_t syscall_##name(int32_t *arg, int argct)
+#define SYSCALL_FUNCTION(name) static int32_t syscall_##name(lssl_vm_t *vm, int32_t *arg, int argct)
 
 SYSCALL_FUNCTION(abs) {
 	if (arg[0]<0) return -arg[0]; else return arg[0];
@@ -48,6 +49,11 @@ SYSCALL_FUNCTION(rand) {
 	return (rand()%(arg[2]-arg[1]))+arg[1];
 }
 
+SYSCALL_FUNCTION(dumpstack) {
+	lssl_vm_dump_stack(vm);
+	return 0;
+}
+
 static const vm_syscall_list_entry_t builtin_syscalls[]={
 	{"abs", syscall_abs, 1}, 
 	{"floor", syscall_floor, 1}, 
@@ -56,7 +62,8 @@ static const vm_syscall_list_entry_t builtin_syscalls[]={
 	{"sin", syscall_sin, 1}, 
 	{"cos", syscall_cos, 1}, 
 	{"tan", syscall_tan, 1}, 
-	{"rand", syscall_rand, 3}
+	{"rand", syscall_rand, 3},
+	{"dump_stack", syscall_dumpstack, 0}
 };
 
 typedef struct syscall_list_t syscall_list_t;
@@ -123,9 +130,9 @@ int vm_syscall_arg_count(int handle) {
 	return ent->argct;
 }
 
-int32_t vm_syscall(int syscall, int32_t *arg, int argct) {
+int32_t vm_syscall(lssl_vm_t *vm, int syscall, int32_t *arg, int argct) {
 	const vm_syscall_list_entry_t *ent=ent_for_handle(syscall);
 	assert(ent && "Invalid syscall entry!");
 	assert(ent->argct==argct && "Invalid arg count for syscall!");
-	return ent->fn(arg, argct);
+	return ent->fn(vm, arg, argct);
 }

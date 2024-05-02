@@ -37,8 +37,7 @@ static ast_node_t *nth_param(ast_node_t *p, int n) {
 	p=p->children;
 	while(p) {
 		if (p->type==AST_TYPE_INSN || 
-			p->type==AST_TYPE_LOCALSIZE || 
-			p->type==AST_TYPE_DATATYPE) {
+			p->type==AST_TYPE_LOCALSIZE) {
 			//ignore
 		} else {
 			n--;
@@ -205,7 +204,7 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_PROGRAM_START) {
 		//ignore
 	} else if (n->type==AST_TYPE_SYSCALL) {
-		codegen(n->children);
+		if (n->children) codegen(n->children);
 		ast_node_t *i=insert_insn_after_all_arg_eval(n, INSN_SYSCALL);
 		i->insn_arg=n->valpos; 
 	} else if (n->type==AST_TYPE_FUNCPTR) {
@@ -217,8 +216,6 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_STRUCTDEF) {
 		//nothing
 	} else if (n->type==AST_TYPE_STRUCTREF) {
-		//n/a
-	} else if (n->type==AST_TYPE_DATATYPE) {
 		//n/a
 	} else if (n->type==AST_TYPE_REF || n->type==AST_TYPE_DEREF) {
 		codegen_node(nth_param(n, 1));

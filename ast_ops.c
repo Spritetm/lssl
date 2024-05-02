@@ -12,6 +12,25 @@
 
 
 
+//The parser allows an empty array dereference (e.g. a[] rather than a[2]) anywhere, while
+//it's only actually valid for the first array deref in an argument in a function declaration.
+//The parser inserts these as ARRAYREF_EMPTY nodes. Here we convert them back to ARRAYREF
+//if it's in a proper place, or throw an error if not.
+void ast_ops_check_empty_array_deref(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_ARRAYREF_EMPTY) {
+			//If this is the first deref in a function arg, the parent must be a FUNCDEFARG.
+			if (n->parent->type==AST_TYPE_FUNCDEFARG) {
+				n->type=AST_TYPE_ARRAYREF;
+			} else {
+				panic_error(n, "Cannot have empty array deref here.");
+			}
+		}
+		if (n->children) ast_ops_check_empty_array_deref(n->children);
+	}
+}
+
+
 //This collates const values, e.g. '(2+4)/3)' gets collated into a single const number '2'.
 static void ast_ops_collate_consts_node(ast_node_t *node) {
 	//We can only collate things that only have child members that are also CONST.
@@ -203,7 +222,7 @@ static void function_number_arguments(ast_node_t *node) {
 	//Find out arg count.
 	int arg_size=arg_size_for_fn(node);
 	//Number args
-	int i=-3-(arg_size-1);
+	int i=-4-(arg_size-1);
 	for (ast_node_t *n=node->children; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCDEFARG) {
 			n->valpos=i++;
@@ -304,60 +323,117 @@ void ast_ops_assoc_structrefs(ast_node_t *node) {
 }
 
 
-void annotate_deref_datatype(ast_node_t *node, ast_node_t *typepos) {
-	if (!node) return;
-	if (!typepos) return;
-	ast_node_t *r, *t;
-	r=ast_find_type(node->children, AST_TYPE_ARRAYREF);
-	t=ast_find_type(typepos->children, AST_TYPE_ARRAYREF);
-	if (r && t) {
-		ast_node_t *a=ast_new_node(AST_TYPE_DATATYPE, &node->loc);
-		a->value=t;
-		a->sibling=node->children;
-		node->children=a;
-		annotate_deref_datatype(r, t);
-		return;
-	} else if (r) {
-		panic_error(r, "Cannot dereference this; not an array");
-		return;
-	}
-	r=ast_find_type(node->children, AST_TYPE_STRUCTMEMBER);
-	t=ast_find_type(typepos->children, AST_TYPE_STRUCTREF);
-	if (r && t) {
-		ast_node_t *a=ast_new_node(AST_TYPE_DATATYPE, &node->loc);
-		a->value=t->value; //the STRUCTDEF associated with the STRUCTREF
-		//find the structmember node associated
-		ast_node_t *structmember=t->value->children;
-		while (structmember!=NULL && strcmp(structmember->name, r->name)!=0) {
-			structmember=structmember->sibling;
+ast_node_t *find_deref_return_type(ast_node_t *node, ast_node_t *type, int is_first) {
+	ast_node_t *n_a=ast_find_type(node->children, AST_TYPE_ARRAYREF);
+	ast_node_t *n_s=ast_find_type(node->children, AST_TYPE_STRUCTMEMBER);
+	ast_node_t *d_a=ast_find_type(type->children, AST_TYPE_ARRAYREF);
+	ast_node_t *d_s=ast_find_type(type->children, AST_TYPE_STRUCTREF);
+	if (n_a && !d_a) {
+		panic_error(node, "Dereferencing non-array!");
+	} else if (n_s && !d_s) {
+		panic_error(node, "Trying to get member of non-struct!");
+	} else if (!n_a && !n_s) {
+		return type;
+	} else if (n_a && d_a) {
+		return find_deref_return_type(n_a, d_a, 0);
+	} else if (n_s && d_s) {
+		ast_node_t *d_m=d_s->value->children;
+		while (strcmp(d_m->name, n_s->name)!=0 && d_m!=NULL) d_m=d_m->sibling;
+		if (d_m==NULL) {
+			panic_error(node, "No member %s in struct %s!\n", n_s->name, d_s->value->name);
+			return NULL;
 		}
-		if (structmember) {
-			annotate_deref_datatype(r, structmember);
-		} else {
-			panic_error(r, "No such member in struct: %s", r->name);
-		}
-		return;
-	} else if (r) {
-		panic_error(r, "Getting member on something that is not a struct");
-		return;
+		return find_deref_return_type(n_s, d_m, 0);
 	}
-
-	//Probably a POD.
-	return;
+	return NULL;
 }
 
-//Add datatype node to non-POD derefs
-//effectively for each part of a deref, it attaches a node indicating the
-//type of what is returned.
-void ast_ops_annotate_datatype(ast_node_t *node) {
+//Returns a pointer to whatever struct or array or POD the deref eventually returns.
+ast_node_t *get_deref_return_type(ast_node_t *node) {
+	return find_deref_return_type(node, node->value, 1);
+}
+
+int ast_ops_node_is_pod(ast_node_t *node) {
+	ast_node_t *n_a=ast_find_type(node->children, AST_TYPE_ARRAYREF);
+	ast_node_t *n_s=ast_find_type(node->children, AST_TYPE_STRUCTMEMBER);
+	return (!n_a && !n_s);
+}
+
+int check_var_type_matches_fn_arg_type(ast_node_t *vardef, ast_node_t *fndef, int initial_array_var) {
+	//Matches if both are PODs. Does not match if one is but the other isn't.
+	if (ast_ops_node_is_pod(vardef)) {
+		return ast_ops_node_is_pod(fndef);
+	} else if (ast_ops_node_is_pod(fndef)) {
+		return 0;
+	}
+
+	ast_node_t *n_a=ast_find_type(vardef->children, AST_TYPE_ARRAYREF);
+	ast_node_t *f_a=ast_find_type(fndef->children, AST_TYPE_ARRAYREF);
+	if (n_a && f_a) {
+		if (!initial_array_var) {
+			//See if arrays are the same size.
+			ast_node_t *n_n=ast_find_type(n_a->children, AST_TYPE_NUMBER);
+			ast_node_t *f_n=ast_find_type(f_a->children, AST_TYPE_NUMBER);
+			if (n_n->number != f_n->number) return 0;
+		}
+		//See if array types match.
+		return check_var_type_matches_fn_arg_type(n_a, f_a, 0);
+	}
+
+	ast_node_t *n_s=ast_find_type(vardef->children, AST_TYPE_STRUCTREF);
+	ast_node_t *f_s=ast_find_type(fndef->children, AST_TYPE_STRUCTREF);
+	if (n_s && f_s) {
+		return n_s->value == f_s->value;
+	}
+
+	//No match.
+	ast_dump(vardef);
+	ast_dump(fndef);
+	return 0;
+}
+
+
+void ast_ops_fix_function_args(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DEREF) {
-			annotate_deref_datatype(node, node->value);
+		if (n->type==AST_TYPE_FUNCCALL) {
+			//iterate over function args
+			//note this code is fscked. It needs to iterate over both the derefs in the
+			//function call in parallel with the funcdefargs of the function definition
+			//and check if the function definition is a POD, and if so change the DEREF
+			//to a REF.
+			//probably also want to check if function args are the same type...
+			ast_node_t *funcdef=n->value;
+			ast_node_t *funcdefarg=ast_find_type(funcdef->children, AST_TYPE_FUNCDEFARG);
+			ast_node_t *funcarg=ast_find_type(n->children, AST_TYPE_DEREF);
+			while (funcarg && funcdefarg) {
+				//Check if arguments have the same type.
+				//Also, if argument is a POD, we need to modify the DEREF to REF.
+				for (ast_node_t *i=n->children; i!=NULL; i=i->sibling) {
+					if (i->type==AST_TYPE_DEREF) {
+						ast_node_t *d_t=get_deref_return_type(i);
+						if (!check_var_type_matches_fn_arg_type(d_t, funcdefarg, 1)) {
+							panic_error(funcdefarg, "Function arg doesn't match type defined by function declaration!");
+						}
+						if (!ast_ops_node_is_pod(d_t)) {
+							i->type=AST_TYPE_REF;
+						}
+					}
+				}
+				
+				//find next arg
+				funcdefarg=ast_find_type(funcdefarg->sibling,  AST_TYPE_FUNCDEFARG);
+				funcarg=ast_find_type(funcarg->sibling, AST_TYPE_DEREF);
+			}
+			if (funcdefarg) {
+				panic_error(node, "Not enough arguments to function '%s'", funcdef->name);
+			}
+			if (funcarg) {
+				panic_error(node, "Too many arguments to function '%s'", funcdef->name);
+			}
 		}
-		if (n->children) ast_ops_annotate_datatype(n->children);
+		if (n->children) ast_ops_fix_function_args(n->children);
 	}
 }
-
 
 static int ast_ops_position_insns_from(ast_node_t *node, int pc) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
@@ -689,11 +765,11 @@ uint8_t *ast_ops_gen_binary(ast_node_t *node, int *len) {
 void ast_ops_do_compile(ast_node_t *prognode) {
 //	ast_dump(prognode); exit(0);
 	ast_ops_fix_parents(prognode);
+	ast_ops_check_empty_array_deref(prognode);
 	ast_ops_assoc_structrefs(prognode);
 	ast_ops_add_program_start(prognode, "main");
 	ast_ops_collate_consts(prognode);
 	ast_ops_attach_symbol_defs(prognode);
-	ast_ops_annotate_datatype(prognode);
 	ast_ops_fix_parents(prognode);
 	ast_ops_add_trailing_return(prognode);
 	ast_ops_fix_parents(prognode);
@@ -701,6 +777,7 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_add_obj_initializers(prognode);
 	ast_ops_annotate_obj_decl_size(prognode);
 	ast_ops_annotate_obj_ref_size(prognode);
+	ast_ops_fix_function_args(prognode);
 	codegen(prognode);
 	ast_ops_fixup_enter_return(prognode);
 	ast_ops_remove_useless_ops(prognode);

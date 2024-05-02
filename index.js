@@ -217,11 +217,16 @@ function syntax_highlight() {
 
 
 function led_tick() {
-
 	const canvas = document.querySelector("#leds");
 	const ctx = canvas.getContext("2d");
 	for (var i=0; i<100; i++) {
 		var leds_ptr=Module.ccall("get_led", "number", ["int", "float"], [i, led_time]);
+		if (leds_ptr==0) {
+			//vm exec error, stop running
+			clearInterval(led_timer);
+			led_timer=null;
+			break;
+		}
 		var r=Module.HEAPU8[leds_ptr+0];
 		var g=Module.HEAPU8[leds_ptr+1];
 		var b=Module.HEAPU8[leds_ptr+2];
