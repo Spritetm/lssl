@@ -49,9 +49,18 @@ function get_sel_pos(container) {
 //Returns a [node, offset in the node] for a certain offset into a [grand]parent node
 function sel_pos_to_node_off(node, off) {
 	var len=0;
+	var t=0;
 	for (const n of node.childNodes) {
 		if (n.nodeType==Node.TEXT_NODE) { //text node
-			if (off<=n.textContent.length) {
+			if (off==0) {
+				// A browser-specific workaround, in 2024?
+				// Firefox acts weird if we put the cursor on a boundary of a textnode
+				// if the node has a newline. We use the alternative notation (cursor
+				// is at the n'th subelement of the container) instead; that does seem
+				// to work OK.
+				return [node, t];
+			}
+			if (off<n.textContent.length) {
 				//Found the node.
 				return [n, off];
 			} else {
@@ -62,6 +71,7 @@ function sel_pos_to_node_off(node, off) {
 			if (fn!==null) return [fn, fo]; //that call found the node
 			len+=fo;
 		}
+		t++;
 	}
 	return [null, len];
 }
@@ -95,11 +105,17 @@ function code_keypress(e) {
 }
 
 function code_keyrelease(e) {
+	//Movement keys won't change the text, and re-highlighting during e.g.
+	//selecting text with shift-arrowkeys will mess with the selection, so we'll
+	//just ignore any keys that can't change the actual text.
+	const ignore=["ArrowUp","ArrowDown", "ArrowLeft", "ArrowRight", "Meta", "PageUp", "PageDown"];
+	if (ignore.includes(e.key)) return;
+
 	const code = document.querySelector("#code_text");
 	//remember cursor pos
 	var off=get_sel_pos(code);
-	console.log(off);
 	compile_errors=new Array(); //clear errors
+
 	syntax_highlight();
 	set_sel_to(code, off);
 	if (compile_timeout===null) clearTimeout(compile_timeout)
@@ -152,6 +168,7 @@ function insert_txtnode_or_error(hltext, code_text, start, end, err, cl) {
 	span.classList.add(cl);
 	var txtnode=new Text(word);
 	span.appendChild(txtnode);
+
 	//This assumes errors do not overlap, and more-or-less happen on a token
 	//boundary (and/or tokens are pretty small).
 	for (const e of err) {
@@ -223,6 +240,7 @@ function led_tick() {
 		var leds_ptr=Module.ccall("get_led", "number", ["int", "float"], [i, led_time]);
 		if (leds_ptr==0) {
 			//vm exec error, stop running
+			console.log("VM ran into a runtime error. Stopping.");
 			clearInterval(led_timer);
 			led_timer=null;
 			break;
