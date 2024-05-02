@@ -57,6 +57,10 @@ uint8_t *get_led(int pos, float t) {
 	return rgb;
 }
 
+void frame_start() {
+	if (!vm) return;
+	led_syscalls_frame_start(vm);
+}
 
 #define CLASS_UNK 0
 #define CLASS_OPER 1

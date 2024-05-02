@@ -239,6 +239,8 @@ function syntax_highlight() {
 function led_tick() {
 	const canvas = document.querySelector("#leds");
 	const ctx = canvas.getContext("2d");
+
+	Module.ccall('frame_start', '', [], []);
 	for (var i=0; i<100; i++) {
 		var leds_ptr=Module.ccall("get_led", "number", ["int", "float"], [i, led_time]);
 		if (leds_ptr==0) {
