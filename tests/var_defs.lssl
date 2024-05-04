@@ -1,0 +1,16 @@
+
+struct a_t {
+	var a;
+	var b[2];
+}
+
+
+var c;
+var d[2];
+a_t e;
+a_t f[2];
+
+function main() {
+	return 42;
+}
+

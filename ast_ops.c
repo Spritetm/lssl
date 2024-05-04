@@ -412,7 +412,7 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 					if (i->type==AST_TYPE_DEREF) {
 						ast_node_t *d_t=get_deref_return_type(i);
 						if (!check_var_type_matches_fn_arg_type(d_t, funcdefarg, 1)) {
-							panic_error(funcdefarg, "Function arg doesn't match type defined by function declaration!");
+							panic_error(n, "Function arg doesn't match type defined by function declaration!");
 						}
 						if (!ast_ops_node_is_pod(d_t)) {
 							i->type=AST_TYPE_REF;
@@ -784,5 +784,5 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_position_insns(prognode);
 	ast_ops_assign_addr_to_fndef_node(prognode);
 	ast_ops_fixup_addrs(prognode);
-	ast_dump(prognode);
+	//ast_dump(prognode);
 }

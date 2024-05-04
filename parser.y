@@ -57,6 +57,8 @@ while (0)
 %param {yyscan_t scanner}
 %locations
 %define api.location.type {file_loc_t}
+%define parse.trace
+
 
 %union{
 	int number;
@@ -426,12 +428,17 @@ func_call: TOKEN_STR TOKEN_LPAREN funccallargs TOKEN_RPAREN {
 		$$->returns=AST_RETURNS_NUMBER;
 	}
 
-funccallargs: %empty { $$=NULL; }
-| expr
+funccallargs: %empty { 
+		$$=NULL; 
+	}
+| funccallarg {
+		$$=$1;
+		printf("br_term\n");
+	}
 | funccallargs TOKEN_COMMA funccallarg {
-	ast_add_sibling($1, $3);
-	$$=$1;
-}
+		ast_add_sibling($1, $3);
+		$$=$1;
+	}
 
 //Note: this ignores that you can e.g. put an array arg into a function accepting
 //an array. We'll fix that up in ast_ops.c.

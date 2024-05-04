@@ -1,0 +1,12 @@
+
+function a(b) {
+	return b;
+}
+
+function main() {
+	var b;
+	var c;
+//ERROR HERE
+//       v
+    a(b, c);
+}
