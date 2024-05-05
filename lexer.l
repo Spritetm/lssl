@@ -45,15 +45,22 @@ hexdigit	[0-9A-Fa-f]
 "("						{ return TOKEN_LPAREN;		}
 ")"						{ return TOKEN_RPAREN;		}
 ";"						{ return TOKEN_SEMICOLON;	}
-","						{ return TOKEN_COMMA;	}
+","						{ return TOKEN_COMMA;		}
 "."						{ return TOKEN_PERIOD;		}
 "="						{ return TOKEN_ASSIGN;		}
-"=="					{ return TOKEN_EQ;	}
-"!>"					{ return TOKEN_NEQ;		}
-"<"						{ return TOKEN_L;		}
-">"						{ return TOKEN_G;		}
-"<="					{ return TOKEN_LEQ;		}
-">="					{ return TOKEN_GEQ;		}
+"&&"					{ return TOKEN_LAND;		}
+"||"					{ return TOKEN_LOR;			}
+"&"						{ return TOKEN_BAND;		}
+"|"						{ return TOKEN_BOR;			}
+"^"						{ return TOKEN_BXOR;		}
+"!"						{ return TOKEN_LNOT;		}
+"~"						{ return TOKEN_BNOT;		}
+"=="					{ return TOKEN_EQ;			}
+"!="					{ return TOKEN_NEQ;			}
+"<"						{ return TOKEN_L;			}
+">"						{ return TOKEN_G;			}
+"<="					{ return TOKEN_LEQ;			}
+">="					{ return TOKEN_GEQ;			}
 "{"						{ return TOKEN_CURLOPEN;	}
 "}"						{ return TOKEN_CURLCLOSE;	}
 "["						{ return TOKEN_SQBOPEN;		}
@@ -61,13 +68,13 @@ hexdigit	[0-9A-Fa-f]
 {digit}+"."{digit}+		{ (yylval)->number=strtof(yytext, NULL)*65536.0; return TOKEN_NUMBER; }
 "0x"{hexdigit}+			{ (yylval)->number=strtol(yytext, NULL, 16)<<16; return TOKEN_NUMBER; }
 {digit}+			 	{ (yylval)->number=strtol(yytext, NULL, 10)<<16; return TOKEN_NUMBER; }
-"var"				 	{ return TOKEN_VAR;		}
-"for"					{ return TOKEN_FOR;		}
-"while"					{ return TOKEN_WHILE;	}
-"if"					{ return TOKEN_IF;		}
-"function"				{ return TOKEN_FUNCTION;}
-"return"				{ return TOKEN_RETURN;	}
-"struct"				{ return TOKEN_STRUCT;	}
+"var"				 	{ return TOKEN_VAR;			}
+"for"					{ return TOKEN_FOR;			}
+"while"					{ return TOKEN_WHILE;		}
+"if"					{ return TOKEN_IF;			}
+"function"				{ return TOKEN_FUNCTION;	}
+"return"				{ return TOKEN_RETURN;		}
+"struct"				{ return TOKEN_STRUCT;		}
 [a-zA-Z0-9_]+			{ (yylval)->str=strdup(yytext); return TOKEN_STR; }
 
 " "

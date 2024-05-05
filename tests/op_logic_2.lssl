@@ -1,0 +1,9 @@
+
+
+function main() {
+	var a=~0;
+	var b=a&0x08;
+	var c=b|0x20;
+	var d=c^0x2;
+	return d;
+}

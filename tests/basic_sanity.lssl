@@ -1,0 +1,6 @@
+
+//basic sanity test, doesn't do anything special.
+
+function main() {
+	return 42;
+}

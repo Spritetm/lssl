@@ -60,6 +60,13 @@ Specifically, there are three stack pointers:
 	LSSL_INS_ENTRY(DIV, ARG_NONE, "Pop two values and push the divided result") \
 	LSSL_INS_ENTRY(ADD, ARG_NONE, "Pop two values and push the added result") \
 	LSSL_INS_ENTRY(SUB, ARG_NONE, "Pop two values and push the subtracted result") \
+	LSSL_INS_ENTRY(LAND, ARG_NONE, "Pop two values and push the logical and-ed result") \
+	LSSL_INS_ENTRY(LOR, ARG_NONE, "Pop two values and push the logical or-ed result") \
+	LSSL_INS_ENTRY(BAND, ARG_NONE, "Pop two values and push the binary and-ed result") \
+	LSSL_INS_ENTRY(BOR, ARG_NONE, "Pop two values and push the binary or-ed result") \
+	LSSL_INS_ENTRY(BXOR, ARG_NONE, "Pop two values and push the binary xor-ed result") \
+	LSSL_INS_ENTRY(BNOT, ARG_NONE, "Pop value and push the bit inverted result") \
+	LSSL_INS_ENTRY(LNOT, ARG_NONE, "Pop value and push the logical inverse result") \
 	LSSL_INS_ENTRY(JMP, ARG_TARGET, "Jump to the argument") \
 	LSSL_INS_ENTRY(JNZ, ARG_TARGET, "Pop value, jump to the argument if it's non-zero") \
 	LSSL_INS_ENTRY(JZ, ARG_TARGET, "Pop value, jump to the argument if it's zero") \

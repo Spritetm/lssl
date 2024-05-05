@@ -61,6 +61,8 @@ static void parser_set_structref(ast_node_t *n, char *name) {
 %token TOKEN_RETURN
 %token TOKEN_PLUSPLUS TOKEN_MINUSMINUS
 %token TOKEN_STRUCT
+%token TOKEN_LOR TOKEN_LAND TOKEN_BOR TOKEN_BAND TOKEN_BXOR
+%token TOKEN_LNOT TOKEN_BNOT
 
 %define api.pure full
 %parse-param {ast_node_t **program}
@@ -87,6 +89,7 @@ field (in which the ast_node now owns the memory) or free()ed here.
 %type<ast> input input_line statement block funcdef stdaloneexpr
 %type<ast> funcdefargs while_statement if_statement for_statement assignment
 %type<ast> expr compf factor br_term term func_call funccallargs
+%type<ast> expr_land expr_bor expr_band expr_bxor expr_comp not_term
 %type<ast> funcdefarg return_statement 
 %type<ast> structdef structmembers structmember 
 %type<ast> dereference array_dereference var_deref var_ref
@@ -119,6 +122,10 @@ input: %empty {
 statement_end: TOKEN_EOL | TOKEN_SEMICOLON | statement_end TOKEN_EOL | statement_end TOKEN_SEMICOLON
 
 input_line: statement statement_end
+//These statements don't have a terminator; e.g. an if ends when the body ends.
+| if_statement
+| for_statement
+| while_statement
 | block
 
 block: TOKEN_CURLOPEN input TOKEN_CURLCLOSE {
@@ -133,9 +140,6 @@ statement: %empty {
 | stdaloneexpr
 | assignment
 | funcdef
-| for_statement
-| while_statement
-| if_statement
 | return_statement
 | structdef
 
@@ -380,7 +384,18 @@ return_statement: TOKEN_RETURN {
 		ast_add_child($$, $2);
 }
 
-expr: compf
+expr: expr_land
+| expr TOKEN_LOR expr_land { $$=ast_new_node_2chld(AST_TYPE_LOR, &@$, $1, $3); }
+expr_land: expr_bor
+| expr TOKEN_LAND expr_bor { $$=ast_new_node_2chld(AST_TYPE_LAND, &@$, $1, $3); }
+expr_bor: expr_bxor
+| expr TOKEN_BOR expr_bxor { $$=ast_new_node_2chld(AST_TYPE_BOR, &@$, $1, $3); }
+expr_bxor: expr_band
+| expr TOKEN_BXOR expr_band { $$=ast_new_node_2chld(AST_TYPE_BXOR, &@$, $1, $3); }
+expr_band: expr_comp
+| expr TOKEN_BAND expr_comp { $$=ast_new_node_2chld(AST_TYPE_BAND, &@$, $1, $3); }
+
+expr_comp: compf
 | expr TOKEN_EQ compf {   $$=ast_new_node_2chld(AST_TYPE_TEQ, &@$, $1, $3); }
 | expr TOKEN_NEQ compf {  $$=ast_new_node_2chld(AST_TYPE_TNEQ, &@$, $1, $3); }
 | expr TOKEN_L compf {    $$=ast_new_node_2chld(AST_TYPE_TL, &@$, $1, $3); }
@@ -392,9 +407,13 @@ compf: factor
 | compf TOKEN_PLUS factor {  $$=ast_new_node_2chld(AST_TYPE_PLUS, &@$, $1, $3); }
 | compf TOKEN_MINUS factor { $$=ast_new_node_2chld(AST_TYPE_MINUS, &@$, $1, $3); }
 
-factor: br_term
-| factor TOKEN_TIMES br_term { $$=ast_new_node_2chld(AST_TYPE_TIMES, &@$, $1, $3); }
-| factor TOKEN_SLASH br_term { $$=ast_new_node_2chld(AST_TYPE_DIVIDE, &@$, $1, $3); }
+factor: not_term
+| factor TOKEN_TIMES not_term { $$=ast_new_node_2chld(AST_TYPE_TIMES, &@$, $1, $3); }
+| factor TOKEN_SLASH not_term { $$=ast_new_node_2chld(AST_TYPE_DIVIDE, &@$, $1, $3); }
+
+not_term: br_term
+| TOKEN_BNOT br_term { $$=ast_new_node(AST_TYPE_BNOT, &@$); ast_add_child($$, $2); }
+| TOKEN_LNOT br_term { $$=ast_new_node(AST_TYPE_LNOT, &@$); ast_add_child($$, $2); }
 
 br_term: term
 | TOKEN_LPAREN expr TOKEN_RPAREN {

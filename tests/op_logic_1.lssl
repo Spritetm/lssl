@@ -1,0 +1,9 @@
+
+
+function main() {
+	var a=0;
+	var b=134;
+	if (a && b) return 0;
+	if (a || b) return 42;
+	return 1;
+}

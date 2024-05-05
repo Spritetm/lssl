@@ -33,13 +33,20 @@ typedef struct ast_node_t ast_node_t;
 	AST_TYPE_ENTRY(DATATYPE) \
 	AST_TYPE_ENTRY(DEREF) \
 	AST_TYPE_ENTRY(REF) \
-	AST_TYPE_ENTRY(MULTI)
+	AST_TYPE_ENTRY(MULTI) \
+	AST_TYPE_ENTRY(LOR) AST_TYPE_ENTRY(LAND) \
+	AST_TYPE_ENTRY(BOR) AST_TYPE_ENTRY(BAND) AST_TYPE_ENTRY(BXOR) \
+	AST_TYPE_ENTRY(LNOT) AST_TYPE_ENTRY(BNOT)
+
 
 #define AST_TYPE_ENTRY(x) AST_TYPE_##x,
 typedef enum {
 	AST_TYPES
 } ast_type_en;
 #undef AST_TYPE_ENTRY
+
+extern const char *ast_type_str[];
+
 
 typedef enum {
 	AST_RETURNS_UNK=0,

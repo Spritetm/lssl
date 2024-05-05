@@ -106,6 +106,22 @@ static void codegen_node(ast_node_t *n) {
 		handle_rhs_lhs_op(n, INSN_MUL);
 	} else if (n->type==AST_TYPE_DIVIDE) {
 		handle_rhs_lhs_op(n, INSN_DIV);
+	} else if (n->type==AST_TYPE_LAND) {
+		handle_rhs_lhs_op(n, INSN_LAND);
+	} else if (n->type==AST_TYPE_LOR) {
+		handle_rhs_lhs_op(n, INSN_LOR);
+	} else if (n->type==AST_TYPE_BAND) {
+		handle_rhs_lhs_op(n, INSN_BAND);
+	} else if (n->type==AST_TYPE_BOR) {
+		handle_rhs_lhs_op(n, INSN_BOR);
+	} else if (n->type==AST_TYPE_BXOR) {
+		handle_rhs_lhs_op(n, INSN_BXOR);
+	} else if (n->type==AST_TYPE_LNOT) {
+		codegen_node(nth_param(n, 1));
+		insert_insn_after_arg_eval(n, INSN_LNOT, 1);
+	} else if (n->type==AST_TYPE_BNOT) {
+		codegen_node(nth_param(n, 1));
+		insert_insn_after_arg_eval(n, INSN_BNOT, 1);
 	} else if (n->type==AST_TYPE_FOR) {
 		codegen_node(nth_param(n, 1)); //initial
 		codegen_node(nth_param(n, 2)); //condition
@@ -245,7 +261,7 @@ static void codegen_node(ast_node_t *n) {
 		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_STRUCT_IDX);
 		i->insn_arg=n->value->size;
 	} else {
-		panic_error(n, "Eek! Unknown ast type %d\n", n->type);
+		panic_error(n, "Eek! Unknown ast type %s (%d)", ast_type_str[n->type], n->type);
 	}
 }
 

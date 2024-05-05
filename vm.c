@@ -151,6 +151,32 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 			int32_t b=pop(vm);
 			int32_t a=pop(vm);
 			push(vm, a-b);
+		} else if (op==INSN_LAND) {
+			int32_t b=pop(vm);
+			int32_t a=pop(vm);
+			push(vm, (a&&b)?(1<<16):0);
+		} else if (op==INSN_LOR) {
+			int32_t b=pop(vm);
+			int32_t a=pop(vm);
+			push(vm, (a||b)?(1<<16):0);
+		} else if (op==INSN_BAND) {
+			int32_t b=pop(vm);
+			int32_t a=pop(vm);
+			push(vm, a&b);
+		} else if (op==INSN_BOR) {
+			int32_t b=pop(vm);
+			int32_t a=pop(vm);
+			push(vm, a|b);
+		} else if (op==INSN_BXOR) {
+			int32_t b=pop(vm);
+			int32_t a=pop(vm);
+			push(vm, a^b);
+		} else if (op==INSN_BNOT) {
+			int32_t a=pop(vm);
+			push(vm, ~a);
+		} else if (op==INSN_LNOT) {
+			int32_t a=pop(vm);
+			push(vm, (a)?0:(1<<16));
 		} else if (op==INSN_JMP) {
 			new_pc=arg;
 		} else if (op==INSN_JNZ) {
@@ -273,7 +299,7 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 			assert(size_from_addr(addr)==1 && "Huh? DEREF to addr with size != 1");
 			push(vm, vm->stack[pos_from_addr(addr)]);
 		} else {
-			printf("Unknown op %d @ pc 0x%x\n", op, vm->pc);
+			printf("Unknown op %s (%d) @ pc 0x%x\n", lssl_vm_ops[op].op, op, vm->pc);
 			vm->error=LSSL_VM_ERR_UNK_OP;
 		}
 		if (!vm->error) vm->pc=new_pc;

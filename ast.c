@@ -32,7 +32,7 @@ static void dump_insn(ast_node_t *node) {
 }
 
 #define AST_TYPE_ENTRY(x) #x,
-const static char *ast_type_str[]={
+const char *ast_type_str[]={
 	AST_TYPES
 };
 #undef AST_TYPE_ENTRY
