@@ -99,5 +99,5 @@ ast_node_t *ast_find_deepest_arrayref(ast_node_t *node);
 ast_node_t *ast_find_deepest_ref(ast_node_t *node);
 ast_node_t *ast_find_type(ast_node_t *node, ast_type_en type);
 void ast_dump(ast_node_t *node);
-
+const file_loc_t *ast_lookup_loc_for_pc(ast_node_t *node, int32_t pc);
 

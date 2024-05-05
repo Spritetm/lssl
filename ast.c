@@ -166,6 +166,19 @@ ast_node_t *ast_find_type(ast_node_t *node, ast_type_en type) {
 	return NULL;
 }
 
+const file_loc_t *ast_lookup_loc_for_pc(ast_node_t *node, int32_t pc) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_INSN && n->insn_type!=INSN_NOP && n->valpos==pc) {
+			//insns don't have a file loc, but their parent does.
+			return &n->parent->loc;
+		}
+		if (n->children) {
+			const file_loc_t *r=ast_lookup_loc_for_pc(n->children, pc);
+			if (r) return r;
+		}
+	}
+	return NULL;
+}
 
 
 

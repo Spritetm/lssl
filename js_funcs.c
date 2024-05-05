@@ -41,7 +41,7 @@ void recompile(char *code) {
 	ast_free_all(prognode);
 
 	vm=lssl_vm_init(program, bin_len, 1024);
-	vm_error_en vm_err;
+	vm_error_t vm_err={};
 	lssl_vm_run_main(vm, &vm_err);
 }
 

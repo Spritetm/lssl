@@ -109,7 +109,7 @@ inline static int size_from_addr(uint32_t addr) {
 }
 
 //Runs until error, or until we return to address -1.
-int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_en *error) {
+int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 	int32_t ret;
 	vm->error=0;
 	while(vm->error==LSSL_VM_ERR_NONE) {
@@ -248,7 +248,7 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_en *error) {
 			int idx=(pop(vm)>>16);
 			uint32_t addr=pop(vm);
 			//printf("array_idx: addr 0x%X\n", addr);
-			if (idx*arg>size_from_addr(addr)) {
+			if (idx*arg>=size_from_addr(addr) || idx<0) {
 				printf("Array out of bounds! Idx is %d, size is %d items of %d. PC=0x%X\n", idx, size_from_addr(addr)/arg, size_from_addr(addr), vm->pc);
 				vm->error=LSSL_VM_ERR_ARRAY_OOB;
 			}
@@ -276,13 +276,14 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_en *error) {
 			printf("Unknown op %d @ pc 0x%x\n", op, vm->pc);
 			vm->error=LSSL_VM_ERR_UNK_OP;
 		}
-		vm->pc=new_pc;
+		if (!vm->error) vm->pc=new_pc;
 	}
-	*error=vm->error;
+	error->type=vm->error;
+	error->pc=vm->pc;
 	return ret;
 }
 
-int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_t *argv, vm_error_en *error) {
+int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_t *argv, vm_error_t *error) {
 	//push the arguments
 	for (int i=0; i<argc; i++) push(vm, argv[i]);
 	//fake call
@@ -308,7 +309,7 @@ void lssl_vm_dump_stack(lssl_vm_t *vm) {
 }
 
 
-int32_t lssl_vm_run_main(lssl_vm_t *vm, vm_error_en *error) {
+int32_t lssl_vm_run_main(lssl_vm_t *vm, vm_error_t *error) {
 	//Initialization and main start from pos 0.
 	push(vm, vm->ap);
 	push(vm, vm->bp);

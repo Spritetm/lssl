@@ -49,7 +49,7 @@ void panic_error(ast_node_t *node, const char *fmt, ...) {
 	printf("\n");
 }
 
-void yyerror (const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, const char *fmt, ...) {
+void yyerror(const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, const char *fmt, ...) {
 	if (check_expected(loc)) return;
 	printf("Error on line %d col %d: ", loc->first_line+1, loc->first_column);
 	va_list ap;
@@ -61,19 +61,27 @@ void yyerror (const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, cons
 
 
 int run_test(char *code) {
+	uint8_t *bin=NULL;
+	int bin_len;
+	lssl_vm_t *vm=NULL;
+	ast_node_t *prognode=NULL;
+	int ret=ERR_OK;
+
 	char *err_pos=strstr(code, "//ERROR HERE");
 	if (err_pos) {
 		while (err_pos && *err_pos!='\n') err_pos++;
 		if (!err_pos) {
 			printf("Invalid ERROR HERE statement\n");
-			return ERR_TEST_ERR;
+			ret=ERR_TEST_ERR;
+			goto cleanup;
 		}
 		err_pos++; //skip past newline
 		int col_pos=0;
 		while (err_pos[col_pos]!='v' && err_pos[col_pos]!='\n') col_pos++;
 		if (err_pos[col_pos]!='v') {
 			printf("Invalid ERROR HERE statement\n");
-			return ERR_TEST_ERR;
+			ret=ERR_TEST_ERR;
+			goto cleanup;
 		}
 		int line_pos=0;
 		char *p=code;
@@ -92,41 +100,59 @@ int run_test(char *code) {
 	yyscan_t myscanner=NULL;
 	yylex_init(&myscanner);
 	yy_scan_string(code, myscanner);
-	ast_node_t *prognode=ast_gen_program_start_node();
+	prognode=ast_gen_program_start_node();
 	yyparse(&prognode->sibling, myscanner);
 	ast_ops_do_compile(prognode);
 	yylex_destroy(myscanner);
 
 	if (err_pos) {
-		if (!expected_error_got) {
-			return ERR_NO_EXPECTED_ERR;
-		} else {
-			return ERR_OK;
+		if (expected_error_got) {
+			ret=ERR_OK;
+			goto cleanup;
 		}
 	}
-	if (unexpected_error_got) return ERR_UNEXPECTED_ERR;
+	if (unexpected_error_got) {
+		ret=ERR_UNEXPECTED_ERR;
+		goto cleanup;
+	}
 
-	uint8_t *bin=NULL;
-	int bin_len;
 	bin=ast_ops_gen_binary(prognode, &bin_len);
 
-	lssl_vm_t *vm=lssl_vm_init(bin, bin_len, 65536);
-	vm_error_en vm_err;
-	int32_t ret=lssl_vm_run_main(vm, &vm_err);
-	if (vm_err) {
-		printf("Running main() returned error %d\n", vm_err);
-		return ERR_RUNTIME;
-	} else if (ret==65536*42) {
-		printf("Ran main() succesfully, returned %f\n", ret/65536.0);
+	vm=lssl_vm_init(bin, bin_len, 65536);
+	vm_error_t vm_err;
+	int32_t vmret=lssl_vm_run_main(vm, &vm_err);
+	if (vm_err.type) {
+		const file_loc_t *loc=ast_lookup_loc_for_pc(prognode, vm_err.pc);
+		if (!loc) {
+			printf("Running main() resulted in an error at pc 0x%X, but file loc didn't resolve!\n", vm_err.pc);
+			ret=ERR_RUNTIME;
+			goto cleanup;
+		} else {
+			yyerror(loc, &prognode, NULL, "Runtime error %d", vm_err.type);
+			if (err_pos && check_expected(loc)) {
+				//We expected this error.
+				ret=ERR_OK;
+				goto cleanup;
+			} else {
+				printf("Running main() returned error %d @ PC=0x%X\n", vm_err.type, vm_err.pc);
+				ret=ERR_RUNTIME;
+				goto cleanup;
+			}
+		}
+	} else if (vmret==65536*42) {
+		printf("Ran main() succesfully, returned %f\n", vmret/65536.0);
 	} else {
-		printf("Ran main() succesfully but it returned %f\n", ret/65536.0);
-		return ERR_RESULT;
+		printf("Ran main() succesfully but it returned %f\n", vmret/65536.0);
+		ret=ERR_RESULT;
+		goto cleanup;
 	}
-	lssl_vm_free(vm);
 
+
+cleanup:
+	lssl_vm_free(vm);
 	ast_free_all(prognode);
 	free(bin);
-	return ERR_OK;
+	return ret;
 }
 
 typedef struct {

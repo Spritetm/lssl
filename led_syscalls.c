@@ -38,21 +38,21 @@ void led_syscalls_init() {
 }
 
 int led_syscalls_frame_start(lssl_vm_t *vm) {
-	vm_error_en error=0;
+	vm_error_t error={};
 	lssl_vm_run_function(vm, led_cb_handle, 0, NULL, &error);
-	if (error) {
-		printf("frame_start vm error %s\n", vm_err_to_str(error));
+	if (error.type) {
+		printf("frame_start vm error %s\n", vm_err_to_str(error.type));
 		return 0;
 	}
 	return 1;
 }
 
 int led_syscalls_calculate_led(lssl_vm_t *vm, int32_t led, float time) {
-	vm_error_en error=0;
+	vm_error_t error={};
 	int32_t args[2]={led<<16, (time*65536)};
 	lssl_vm_run_function(vm, led_cb_handle, 2, args, &error);
-	if (error) {
-		printf("calculate_led vm error %s\n", vm_err_to_str(error));
+	if (error.type) {
+		printf("calculate_led vm error %s\n", vm_err_to_str(error.type));
 		return 0;
 	}
 	return 1;

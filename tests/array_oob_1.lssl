@@ -1,0 +1,7 @@
+
+function main() {
+	var a[3];
+//ERROR HERE
+//           v
+    return a[3];
+}
