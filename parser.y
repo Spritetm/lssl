@@ -424,6 +424,11 @@ term: TOKEN_NUMBER {
 		$$->number=$1;
 		$$->returns=AST_RETURNS_CONST;
 	 }
+| TOKEN_MINUS TOKEN_NUMBER {
+		$$=ast_new_node(AST_TYPE_NUMBER, &@$);
+		$$->number=-$2;
+		$$->returns=AST_RETURNS_CONST;
+	}
 | var_deref
 | var_deref TOKEN_PLUSPLUS {
 		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);

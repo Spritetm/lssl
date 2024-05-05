@@ -1,7 +1,7 @@
 
 function main() {
 	var a[3];
-	var b=0-1;
+	var b=-1;
 //ERROR HERE
 //           v
     return a[b];
