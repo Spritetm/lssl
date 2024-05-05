@@ -71,7 +71,8 @@ Specifically, there are three stack pointers:
 	LSSL_INS_ENTRY(JNZ, ARG_TARGET, "Pop value, jump to the argument if it's non-zero") \
 	LSSL_INS_ENTRY(JZ, ARG_TARGET, "Pop value, jump to the argument if it's zero") \
 	LSSL_INS_ENTRY(ENTER, ARG_INT, "Increase sp by argument to make space for local vars") \
-	LSSL_INS_ENTRY(RETURN, ARG_INT, "Pop value, restore sp to bp, pop return address, bp and ap, push value") \
+	LSSL_INS_ENTRY(RETURN, ARG_INT, "Pop value, restore sp to bp, pop return address, bp and ap, " \
+			"subtract arg from sp (to account for function args), push value") \
 	LSSL_INS_ENTRY(CALL, ARG_FUNCTION, "Push ap, bp and pc, set bp=sp, jump to arg") \
 	LSSL_INS_ENTRY(POP, ARG_NONE, "Pop value and discard") \
 	LSSL_INS_ENTRY(TEQ, ARG_NONE, "Pop two values, push 1 if equal, 0 otherwise") \

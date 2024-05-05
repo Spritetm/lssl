@@ -41,6 +41,7 @@ int check_expected(const YYLTYPE *loc) {
 
 void panic_error(ast_node_t *node, const char *fmt, ...) {
 	if (check_expected(&node->loc)) return;
+	unexpected_error_got=1;
 	printf("Error on line %d col %d: ", node->loc.first_line+1, node->loc.first_column);
 	va_list ap;
 	va_start(ap, fmt);
@@ -51,6 +52,7 @@ void panic_error(ast_node_t *node, const char *fmt, ...) {
 
 void yyerror(const YYLTYPE *loc, ast_node_t **program, yyscan_t yyscanner, const char *fmt, ...) {
 	if (check_expected(loc)) return;
+	unexpected_error_got=1;
 	printf("Error on line %d col %d: ", loc->first_line+1, loc->first_column);
 	va_list ap;
 	va_start(ap, fmt);
@@ -118,6 +120,7 @@ int run_test(char *code) {
 
 	bin=ast_ops_gen_binary(prognode, &bin_len);
 
+	led_syscalls_clear();
 	vm=lssl_vm_init(bin, bin_len, 65536);
 	vm_error_t vm_err;
 	int32_t vmret=lssl_vm_run_main(vm, &vm_err);

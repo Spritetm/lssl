@@ -8,11 +8,26 @@
 #include "led_syscalls.h"
 #include "vm_syscall.h"
 #include "vm.h"
+#include "error.h"
+#include "ast.h"
+
+void bail_if_vm_err(lssl_vm_t *vm, ast_node_t *prognode, vm_error_t *vm_err) {
+	if (vm_err->type==0) return;
+	const file_loc_t *loc=ast_lookup_loc_for_pc(prognode, vm_err->pc);
+	if (!loc) {
+		printf("Running main() resulted in an error at pc 0x%X, but file loc didn't resolve!\n", vm_err->pc);
+		exit(1);
+	} else {
+		yyerror(loc, &prognode, NULL, "Runtime error %s", vm_err_to_str(vm_err->type));
+		exit(1);
+	}
+}
 
 int main(int argc, char **argv) {
 	char buf[1024*1024]={};
 	char *infile="";
 	char *outfile="";
+	int sim_leds=0;
 	int do_run=0;
 	int error=0;
 	int print_ast=0;
@@ -28,6 +43,10 @@ int main(int argc, char **argv) {
 		} else if (strcmp(argv[i], "-o")==0 && argc>i+1) {
 			i++;
 			outfile=argv[i];
+		} else if (strcmp(argv[i], "-s")==0 && argc>i+1) {
+			i++;
+			do_run=1;
+			sim_leds=atoi(argv[i]);
 		} else if (strlen(infile)==0) {
 			infile=argv[i];
 		} else {
@@ -43,6 +62,7 @@ int main(int argc, char **argv) {
 		printf("  -r: run program afterward\n");
 		printf("  -d: print parser debug info\n");
 		printf("  -a: dump AST tree\n");
+		printf("  -s n: Simulate n leds afterwards (implies -r)\n");
 		exit(1);
 	}
 
@@ -97,21 +117,36 @@ int main(int argc, char **argv) {
 		fclose(f);
 	}
 
-	ast_free_all(prognode);
-
 	if (do_run) {
 		printf("Compile done. Running VM code.\n");
 		lssl_vm_t *vm=lssl_vm_init(bin, bin_len, 65536);
-		vm_error_en vm_err;
+		vm_error_t vm_err;
 		int32_t ret=lssl_vm_run_main(vm, &vm_err);
-		if (error) {
-			printf("Running main() returned error %d\n", vm_err);
+		if (vm_err.type) {
+			printf("Running main() returned error %d\n", vm_err.type);
+			bail_if_vm_err(vm, prognode, &vm_err);
 		} else {
 			printf("Ran main() succesfully, returned %f\n", ret/65536.0);
+		}
+		if (sim_leds!=0) {
+			printf("Simulating. Ctrl-C exits.\n");
+			float time=0;
+			while(1) {
+				led_syscalls_frame_start(vm, &vm_err);
+				if (vm_err.type) printf("At t=%f, frame_start_init:\n", time);
+				bail_if_vm_err(vm, prognode, &vm_err);
+				for (int i=0; i<sim_leds; i++) {
+					led_syscalls_calculate_led(vm, i, time, &vm_err);
+					if (vm_err.type) printf("At t=%f, led %d, calculate_led:\n", time, i);
+					bail_if_vm_err(vm, prognode, &vm_err);
+				}
+				time+=0.05;
+			}
 		}
 		lssl_vm_free(vm);
 		vm_syscall_free();
 	}
 
+	ast_free_all(prognode);
 	free(bin);
 }

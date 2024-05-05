@@ -40,6 +40,7 @@ lssl_vm_t *lssl_vm_init(uint8_t *program, int prog_len, int stack_size_words) {
 	if (!ret) goto error;
 
 	ret->progmem=&program[8];
+	ret->proglen=prog_len;
 	ret->stack_size=stack_size_words;
 	ret->stack=calloc(stack_size_words, sizeof(uint32_t));
 	ret->sp=glob_sz;
@@ -312,6 +313,10 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 			printf("Unknown op %s (%d) @ pc 0x%x\n", lssl_vm_ops[op].op, op, vm->pc);
 			vm->error=LSSL_VM_ERR_UNK_OP;
 		}
+		if (new_pc<0 || new_pc>=vm->proglen) {
+			printf("Aiee! Op at pc=0x%X wants to go to 0x%X!\n", vm->pc, new_pc);
+			vm->error=LSSL_VM_ERR_INTERNAL;
+		}
 		if (!vm->error) vm->pc=new_pc;
 	}
 	error->type=vm->error;
@@ -320,6 +325,7 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 }
 
 int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_t *argv, vm_error_t *error) {
+	int32_t old_sp=vm->sp;
 	//push the arguments
 	for (int i=0; i<argc; i++) push(vm, argv[i]);
 	//fake call
@@ -329,8 +335,12 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 	vm->pc=fn_handle;
 	vm->bp=vm->sp;
 	vm->ap=vm->sp;
-
-	return lssl_vm_run(vm, error);
+	int32_t v=lssl_vm_run(vm, error);
+	if (old_sp!=vm->sp) {
+		printf("Aiee! SP before and after calling fn doesn't match. Before 0x%X after 0x%X\n", old_sp, vm->sp);
+		error->type=LSSL_VM_ERR_INTERNAL;
+	}
+	return v;
 }
 
 void lssl_vm_dump_stack(lssl_vm_t *vm) {
@@ -346,14 +356,7 @@ void lssl_vm_dump_stack(lssl_vm_t *vm) {
 
 
 int32_t lssl_vm_run_main(lssl_vm_t *vm, vm_error_t *error) {
-	//Initialization and main start from pos 0.
-	push(vm, vm->ap);
-	push(vm, vm->bp);
-	push(vm, -1); //fake return address
-	vm->pc=0;
-	vm->bp=vm->sp;
-	vm->ap=vm->sp;
-	return lssl_vm_run(vm, error);
+	return lssl_vm_run_function(vm, 0, 0, NULL, error);
 }
 
 void lssl_vm_free(lssl_vm_t *vm) {

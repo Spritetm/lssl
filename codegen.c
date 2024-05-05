@@ -123,18 +123,20 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_BNOT, 1);
 	} else if (n->type==AST_TYPE_FOR) {
+		//Note: the body and increment are swapped in the AST wrt the order
+		//they appear in the code.
 		codegen_node(nth_param(n, 1)); //initial
 		codegen_node(nth_param(n, 2)); //condition
-		codegen_node(nth_param(n, 3)); //increment
-		codegen_node(nth_param(n, 4)); //body
-		//dummy so we can jump back there
+		codegen_node(nth_param(n, 3)); //body
+		codegen_node(nth_param(n, 4)); //increment
+		//dummy after initial so we can jump back there
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_NOP, 1);
-		//conditional jump to end
+		//conditional jump to end after condition
 		ast_node_t *j=insert_insn_after_arg_eval(n, INSN_JZ, 2); 
-		//jump to condition
-		ast_node_t *k=insert_insn_after_arg_eval(n, INSN_JMP, 3);
-		//nop for address placeholder
-		ast_node_t *l=insert_insn_after_arg_eval(n, INSN_NOP, 3);
+		//jump to condition at end of body/increment
+		ast_node_t *k=insert_insn_after_arg_eval(n, INSN_JMP, 4);
+		//nop for address placeholder for conditional jump
+		ast_node_t *l=insert_insn_after_arg_eval(n, INSN_NOP, 4);
 		j->value=l;
 		k->value=i;
 	} else if (n->type==AST_TYPE_IF) {

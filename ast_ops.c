@@ -426,7 +426,8 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 			//probably also want to check if function args are the same type...
 			ast_node_t *funcdef=n->value;
 			ast_node_t *funcdefarg=ast_find_type(funcdef->children, AST_TYPE_FUNCDEFARG);
-			ast_node_t *funcarg=ast_find_type(n->children, AST_TYPE_DEREF);
+			ast_node_t *funcarg=n->children;
+			int argct=0;
 			while (funcarg && funcdefarg) {
 				//Check if arguments have the same type.
 				//Also, if argument is not a POD, we need to modify the DEREF to REF.
@@ -441,16 +442,17 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 						}
 					}
 				}
+				argct++;
 				
 				//find next arg
 				funcdefarg=ast_find_type(funcdefarg->sibling,  AST_TYPE_FUNCDEFARG);
-				funcarg=ast_find_type(funcarg->sibling, AST_TYPE_DEREF);
+				funcarg=funcarg->sibling;
 			}
 			if (funcdefarg) {
-				panic_error(node, "Not enough arguments to function '%s'", funcdef->name);
+				panic_error(node, "Not enough arguments to function '%s' (got %d)", funcdef->name, argct);
 			}
 			if (funcarg) {
-				panic_error(node, "Too many arguments to function '%s'", funcdef->name);
+				panic_error(node, "Too many arguments to function '%s' (got %d)", funcdef->name, argct);
 			}
 			//Check if one of the arguments is a function pointer.
 			if (n->children) {

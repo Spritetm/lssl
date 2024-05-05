@@ -24,7 +24,8 @@ test: $(SRC_BASE:.c=.o) $(SRC_TEST:.c=.o)
 	$(CC) $(CFLAGS) -o $@  $^ -lm
 
 
-EMSCR_ARGS = -O2 -sEXPORTED_RUNTIME_METHODS=ccall,cwrap -sEXPORTED_FUNCTIONS=_init,_recompile,_get_led,_tokenize_for_syntax_hl,_free
+EMSCR_ARGS = -O2 -sEXPORTED_RUNTIME_METHODS=ccall,cwrap 
+EMSCR_ARGS += -sEXPORTED_FUNCTIONS=_init,_recompile,_get_led,_tokenize_for_syntax_hl,_free,_frame_start
 EMSCR_ARGS +=-sASSERTIONS=1 -sFILESYSTEM=0 -gsource-map --source-map-base=./
 
 lssl.js: $(SRC_BASE) $(SRC_JS)

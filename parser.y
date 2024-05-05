@@ -246,8 +246,9 @@ for_statement: TOKEN_FOR TOKEN_LPAREN statement TOKEN_SEMICOLON expr TOKEN_SEMIC
 		$$=ast_new_node(AST_TYPE_FOR, &@$);
 		ast_add_child($$, $3);
 		ast_add_child($$, $5);
-		ast_add_child($$, $7);
+		//Note! Body and increment are swapped in AST wrt how you'd read it in the code.
 		ast_add_child($$, $9);
+		ast_add_child($$, $7);
 	}
 
 assignment: var_ref TOKEN_ASSIGN expr {

@@ -47,7 +47,7 @@ SYSCALL_FUNCTION(tan) {
 
 SYSCALL_FUNCTION(rand) {
 	//note this returns a real number
-	return (rand()%(arg[2]-arg[1]))+arg[1];
+	return (rand()%(arg[1]-arg[0]))+arg[0];
 }
 
 SYSCALL_FUNCTION(dumpstack) {

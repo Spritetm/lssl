@@ -3,7 +3,7 @@ struct part_t {
 	var speed;
 	var r;
 	var g;
-	var b;	
+	var b;
 };
 
 part_t part[100];
@@ -13,9 +13,7 @@ function update_part(part_t p) {
 	if (p.pos<=0 || p.pos>100) {
 		p.pos=rand(0, 100);
 		p.speed=rand(0.1, 2);
-		if (rand(0, 2)>1) {
-			p.speed=0-p.speed;
-		}
+		if (rand(0, 2)>1) p.speed=0-p.speed;
 		p.r=rand(0, 255);
 		p.g=rand(0, 255);
 		p.b=rand(0, 255);
@@ -27,7 +25,6 @@ function frame_start() {
 	for (var x=0; x<100; x++) update_part(part[x]);
 }
 
-
 function set_led(pos, time){
 	var r=0, g=0, b=0;
 	for (var x=0; x<100; x++) {
@@ -36,8 +33,8 @@ function set_led(pos, time){
 			g=part[x].g;
 			b=part[x].b;
 		}
-		led_set_rgb(r, g, b);
 	}
+	led_set_rgb(r, g, b);
 }
 
 
