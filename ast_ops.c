@@ -419,11 +419,6 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->type==AST_TYPE_FUNCCALL) {
 			//iterate over function args
-			//note this code is fscked. It needs to iterate over both the derefs in the
-			//function call in parallel with the funcdefargs of the function definition
-			//and check if the function definition is a POD, and if so change the DEREF
-			//to a REF.
-			//probably also want to check if function args are the same type...
 			ast_node_t *funcdef=n->value;
 			ast_node_t *funcdefarg=ast_find_type(funcdef->children, AST_TYPE_FUNCDEFARG);
 			ast_node_t *funcarg=n->children;
@@ -431,16 +426,27 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 			while (funcarg && funcdefarg) {
 				//Check if arguments have the same type.
 				//Also, if argument is not a POD, we need to modify the DEREF to REF.
-				for (ast_node_t *i=n->children; i!=NULL; i=i->sibling) {
-					if (i->type==AST_TYPE_DEREF) {
-						ast_node_t *d_t=get_deref_return_type(i);
-						if (!check_var_type_matches_fn_arg_type(d_t, funcdefarg, 1)) {
-							panic_error(n, "Function arg doesn't match type defined by function declaration!");
-						}
-						if (!ast_ops_decl_node_is_pod(d_t)) {
-							i->type=AST_TYPE_REF;
-						}
+				if (funcarg->type==AST_TYPE_DEREF || funcarg->type==AST_TYPE_REF) {
+					ast_node_t *d_t=get_deref_return_type(funcarg);
+					//At this point:
+					// funcarg points to the function call argument itself
+					// d_t points to the declare of whatever type i is
+					// funcdefarg points to the funcarg of the arg in the funcdef
+					if (!check_var_type_matches_fn_arg_type(d_t, funcdefarg, 1)) {
+						panic_error(n, "Function arg %d doesn't match type defined by function declaration!", argct);
+						ast_dump(funcarg);
+						ast_dump(d_t);
+						ast_dump(funcdefarg);
 					}
+					if (!ast_ops_decl_node_is_pod(d_t)) {
+						funcarg->type=AST_TYPE_REF;
+					}
+				} else if (funcarg->type==AST_TYPE_NUMBER) {
+					//okay
+				} else {
+					printf("Didn't expect funcarg content:\n");
+					ast_dump(funcarg);
+					assert(0);
 				}
 				argct++;
 				
