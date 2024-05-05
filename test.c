@@ -150,7 +150,6 @@ int run_test(char *code) {
 		goto cleanup;
 	}
 
-
 cleanup:
 	lssl_vm_free(vm);
 	ast_free_all(prognode);
@@ -197,10 +196,15 @@ int main(int argc, char **argv) {
 		"OK", "Test condition malformed", "Expected error did not happen", 
 		"Unexpected compilation error", "Runtime error", "Result did not match expectation"
 	};
+	printf(" *** Results ***\n");
 	int ok=0, fail=0;
 	for (int i=0; i<res; i++) {
-		if (errors[i].result==ERR_OK) ok++; else fail++;
-		printf("%s: %s\n", errors[i].file, result_str[errors[i].result]);
+		if (errors[i].result==ERR_OK) {
+			ok++; 
+		} else {
+			 fail++;
+			printf("%s: %s\n", errors[i].file, result_str[errors[i].result]);
+		}
 	}
 	printf(" *** Success: %d Fail %d *** \n", ok, fail);
 }

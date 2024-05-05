@@ -1,0 +1,9 @@
+
+
+function main() {
+	var a;
+	var b[2];
+//ERROR HERE
+//  v
+    b=a;
+}

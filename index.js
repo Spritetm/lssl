@@ -7,7 +7,8 @@ window.addEventListener("load", (event) => {
 	const code = document.querySelector("#code_text");
 	code.addEventListener("keydown", code_keypress);
 	code.addEventListener("keyup", code_keyrelease);
-	code.textContent=localStorage.getItem("code");
+	var t=localStorage.getItem("code");
+	if (t) code.textContent=t;
 });
 
 

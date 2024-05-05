@@ -409,11 +409,8 @@ int check_var_type_matches_fn_arg_type(ast_node_t *vardef, ast_node_t *fndef, in
 	}
 
 	//No match.
-	ast_dump(vardef);
-	ast_dump(fndef);
 	return 0;
 }
-
 
 void ast_ops_fix_function_args(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
@@ -483,6 +480,23 @@ static int ast_ops_position_insns_from(ast_node_t *node, int pc) {
 		}
 	}
 	return pc;
+}
+
+void ast_ops_set_ref_deref_return_type(ast_node_t *node) {
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_REF || n->type==AST_TYPE_DEREF) {
+			ast_node_t *r=get_deref_return_type(n);
+//			ast_dump(r);
+			if (ast_find_type(r->children, AST_TYPE_ARRAYREF)) {
+				n->returns=AST_RETURNS_ARRAY;
+			} else if (ast_find_type(r->children, AST_TYPE_STRUCTREF)) {
+				n->returns=AST_RETURNS_STRUCT;
+			} else {
+				n->returns=AST_RETURNS_NUMBER;
+			}
+		}
+		ast_ops_set_ref_deref_return_type(n->children);
+	}
 }
 
 //Assigns an address to all instructions
@@ -843,6 +857,7 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_annotate_obj_decl_size(prognode);
 	ast_ops_annotate_obj_ref_size(prognode);
 	ast_ops_fix_function_args(prognode);
+	ast_ops_set_ref_deref_return_type(prognode);
 	codegen(prognode);
 	ast_ops_fixup_enter_return(prognode);
 	ast_ops_remove_useless_ops(prognode);

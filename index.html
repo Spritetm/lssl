@@ -22,18 +22,55 @@
 		<link rel="stylesheet" type="text/css" href="index.css">
 	</head>
 	<body>
-		<pre disabled="true" contentEditable="true" id="code_text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" style="width: 50%; height: 20em;">
+		<pre disabled="true" contentEditable="true" id="code_text" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+struct part_t {
+	var pos;
+	var speed;
+	var r;
+	var g;
+	var b;	
+};
+
+part_t part[10];
+
+function update_part(part_t p) {
+	p.pos=p.pos+p.speed;
+	if (p.pos<=0 || p.pos>100) {
+		p.pos=0;
+		if (rand(0, 2)>1) p.pos=100;
+		p.speed=rand(0.1, 2);
+		if (rand(0, 2)>1) p.speed=0-p.speed;
+		p.r=rand(0, 255);
+		p.g=rand(0, 255);
+		p.b=rand(0, 255);
+	}
+}
+
+
+function frame_start() {
+	for (var x=0; x<10; x++) update_part(part[x])
+}
+
 function set_led(pos, time){
-	var a=pos*0.1+time*2;
-	var r=sin(a)*127+128;
-	var g=sin(a+2.1)*127+128;
-	var b=sin(a+4.2)*127+128;
+	var r=0, g=0, b=0;
+	for (var x=0; x<10; x++) {
+		if (abs(part[x].pos-pos)<1) {
+			r=part[x].r;
+			g=part[x].g;
+			b=part[x].b;
+		}
+	}
 	led_set_rgb(r, g, b);
-}<br>
+}
+
+
+function main() {
+	register_led_cb(set_led);
+	register_frame_start_cb(frame_start);
+}
+
+
 <br>
-function main() {<br>
-	register_led_cb(set_led);<br>
-}<br>
 </pre>
 		<br>
 		<canvas id="leds" width="100" height="1" style="width:100%; height: 20px;">

@@ -81,12 +81,34 @@ static ast_node_t *insert_insn_after_all_arg_eval(ast_node_t *parent, lssl_insn_
 	return n;
 }
 
+static void codegen_node(ast_node_t *n);
 
-void handle_rhs_lhs_op(ast_node_t *node, lssl_insn_enum type) {
-	codegen_node(nth_param(node, 1));
-	codegen_node(nth_param(node, 2));
+//Same as codegen, but checks if the arg is a ref/deref of a POD.
+void codegen_node_pod(ast_node_t *n) {
+	if (n->returns==AST_RETURNS_ARRAY) {
+		panic_error(n, "Expected number, got array!");
+	} else if (n->returns==AST_RETURNS_STRUCT) {
+		panic_error(n, "Expected number, got struct!");
+	} else if (n->returns==AST_RETURNS_FUNCTION) {
+		panic_error(n, "Expected number, got function!");
+	}
+	codegen_node(n);
+}
+
+
+void handle_rhs_lhs_op_pod(ast_node_t *node, lssl_insn_enum type) {
+	codegen_node_pod(nth_param(node, 1));
+	codegen_node_pod(nth_param(node, 2));
 	insert_insn_after_arg_eval(node, type, 2);
 }
+
+void handle_rhs_lhs_op(ast_node_t *node, lssl_insn_enum type) {
+	codegen_node_pod(nth_param(node, 1));
+	codegen_node_pod(nth_param(node, 2));
+	insert_insn_after_arg_eval(node, type, 2);
+}
+
+
 
 static void codegen_node(ast_node_t *n) {
 	if (!n) return;
@@ -99,34 +121,34 @@ static void codegen_node(ast_node_t *n) {
 			i->insn_arg=n->number;
 		}
 	} else if (n->type==AST_TYPE_PLUS) {
-		handle_rhs_lhs_op(n, INSN_ADD);
+		handle_rhs_lhs_op_pod(n, INSN_ADD);
 	} else if (n->type==AST_TYPE_MINUS) {
-		handle_rhs_lhs_op(n, INSN_SUB);
+		handle_rhs_lhs_op_pod(n, INSN_SUB);
 	} else if (n->type==AST_TYPE_TIMES) {
-		handle_rhs_lhs_op(n, INSN_MUL);
+		handle_rhs_lhs_op_pod(n, INSN_MUL);
 	} else if (n->type==AST_TYPE_DIVIDE) {
-		handle_rhs_lhs_op(n, INSN_DIV);
+		handle_rhs_lhs_op_pod(n, INSN_DIV);
 	} else if (n->type==AST_TYPE_LAND) {
-		handle_rhs_lhs_op(n, INSN_LAND);
+		handle_rhs_lhs_op_pod(n, INSN_LAND);
 	} else if (n->type==AST_TYPE_LOR) {
-		handle_rhs_lhs_op(n, INSN_LOR);
+		handle_rhs_lhs_op_pod(n, INSN_LOR);
 	} else if (n->type==AST_TYPE_BAND) {
-		handle_rhs_lhs_op(n, INSN_BAND);
+		handle_rhs_lhs_op_pod(n, INSN_BAND);
 	} else if (n->type==AST_TYPE_BOR) {
-		handle_rhs_lhs_op(n, INSN_BOR);
+		handle_rhs_lhs_op_pod(n, INSN_BOR);
 	} else if (n->type==AST_TYPE_BXOR) {
-		handle_rhs_lhs_op(n, INSN_BXOR);
+		handle_rhs_lhs_op_pod(n, INSN_BXOR);
 	} else if (n->type==AST_TYPE_LNOT) {
-		codegen_node(nth_param(n, 1));
+		codegen_node_pod(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_LNOT, 1);
 	} else if (n->type==AST_TYPE_BNOT) {
-		codegen_node(nth_param(n, 1));
+		codegen_node_pod(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_BNOT, 1);
 	} else if (n->type==AST_TYPE_FOR) {
 		//Note: the body and increment are swapped in the AST wrt the order
 		//they appear in the code.
 		codegen_node(nth_param(n, 1)); //initial
-		codegen_node(nth_param(n, 2)); //condition
+		codegen_node_pod(nth_param(n, 2)); //condition
 		codegen_node(nth_param(n, 3)); //body
 		codegen_node(nth_param(n, 4)); //increment
 		//dummy after initial so we can jump back there
@@ -140,14 +162,14 @@ static void codegen_node(ast_node_t *n) {
 		j->value=l;
 		k->value=i;
 	} else if (n->type==AST_TYPE_IF) {
-		codegen_node(nth_param(n, 1)); //condition
+		codegen_node_pod(nth_param(n, 1)); //condition
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_JZ, 1);
 		codegen_node(nth_param(n, 2)); //body
 		ast_node_t *j=insert_insn_after_arg_eval(n, INSN_NOP, 2);
 		i->value=j;
 	} else if (n->type==AST_TYPE_WHILE) {
 		ast_node_t *h=insert_insn_before_arg_eval(n, INSN_NOP);
-		codegen_node(nth_param(n, 1)); //condition
+		codegen_node_pod(nth_param(n, 1)); //condition
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_JZ, 1);
 		codegen_node(nth_param(n, 2)); //body
 		ast_node_t *j=insert_insn_after_arg_eval(n, INSN_JMP, 2);
@@ -155,13 +177,13 @@ static void codegen_node(ast_node_t *n) {
 		ast_node_t *k=insert_insn_after_arg_eval(n, INSN_NOP, 2);
 		i->value=k;
 	} else if (n->type==AST_TYPE_TEQ) {
-		handle_rhs_lhs_op(n, INSN_TEQ);
+		handle_rhs_lhs_op_pod(n, INSN_TEQ);
 	} else if (n->type==AST_TYPE_TNEQ) {
-		handle_rhs_lhs_op(n, INSN_TNEQ);
+		handle_rhs_lhs_op_pod(n, INSN_TNEQ);
 	} else if (n->type==AST_TYPE_TL) {
-		handle_rhs_lhs_op(n, INSN_TL);
+		handle_rhs_lhs_op_pod(n, INSN_TL);
 	} else if (n->type==AST_TYPE_TLEQ) {
-		handle_rhs_lhs_op(n, INSN_TLEQ);
+		handle_rhs_lhs_op_pod(n, INSN_TLEQ);
 	} else if (n->type==AST_TYPE_FUNCDEF) {
 		insert_insn_before_arg_eval(n, INSN_ENTER);
 		codegen(n->children);
@@ -187,19 +209,19 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_ASSIGN) {
 		//Arg 1: address of thing to assign to
 		//Arg 2: value to assign
-		codegen_node(nth_param(n, 1));
-		codegen_node(nth_param(n, 2));
+		codegen_node_pod(nth_param(n, 1));
+		codegen_node_pod(nth_param(n, 2));
 		insert_insn_after_arg_eval(n, INSN_WR_VAR, 2);
 	} else if (n->type==AST_TYPE_POST_ADD) {
-		codegen_node(nth_param(n, 1));
+		codegen_node_pod(nth_param(n, 1));
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_POST_ADD, 1);
 		i->insn_arg=n->number;
 	} else if (n->type==AST_TYPE_PRE_ADD) {
-		codegen_node(nth_param(n, 1));
+		codegen_node_pod(nth_param(n, 1));
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_PRE_ADD, 1);
 		i->insn_arg=n->number;
 	} else if (n->type==AST_TYPE_RETURN) {
-		codegen_node(nth_param(n, 1));
+		codegen_node_pod(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_RETURN, 1);
 	} else if (n->type==AST_TYPE_DECLARE) {
 		if (n->returns==AST_RETURNS_ARRAY) {
@@ -207,7 +229,7 @@ static void codegen_node(ast_node_t *n) {
 			assert(a && "No arrayref in returns->array declare?");
 			ast_node_t *j=insert_insn_before_arg_eval(n, ast_is_local(n)?INSN_LEA:INSN_LEA_G);
 			j->value=n;
-			codegen_node(nth_param(a, 1)); //size of the array, in items
+			codegen_node_pod(nth_param(a, 1)); //size of the array, in items
 			ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAYINIT, 1);
 			i->insn_arg=a->size;
 		} else if (n->returns==AST_RETURNS_STRUCT) {
@@ -254,7 +276,7 @@ static void codegen_node(ast_node_t *n) {
 			insert_insn_after_all_arg_eval(n, INSN_DEREF);
 		}
 	} else if (n->type==AST_TYPE_ARRAYREF) {
-		codegen_node(nth_param(n, 1));
+		codegen_node_pod(nth_param(n, 1));
 		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAY_IDX, 1);
 		i->insn_arg=n->size;
 		codegen_node(nth_param(n, 2));

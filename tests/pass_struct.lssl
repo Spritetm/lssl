@@ -1,0 +1,26 @@
+
+struct x_t {
+	var xx;
+	var yx;
+};
+
+x_t p[10];
+
+function do_thing(x_t t, v) {
+	t.xx=v;
+}
+
+function main() {
+	for (var x=0; x<10; x++) {
+		var y=x;
+		do_thing(p[x], y);
+	}
+
+	for (var x=0; x<10; x++) {
+		if (p[x].xx!=x) {
+			return p[x].xx;
+		}
+	}
+	return 42;
+
+}

@@ -1,6 +1,9 @@
+
 #code_text {
 	overflow: scroll;
 	tab-size: 4;
+	height: 85vh;
+	width: 100vw;
 }
 
 #code_text > .oper {
