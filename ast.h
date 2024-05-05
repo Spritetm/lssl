@@ -32,7 +32,8 @@ typedef struct ast_node_t ast_node_t;
 	AST_TYPE_ENTRY(STRUCTDEF) AST_TYPE_ENTRY(STRUCTREF) AST_TYPE_ENTRY(STRUCTMEMBER) \
 	AST_TYPE_ENTRY(DATATYPE) \
 	AST_TYPE_ENTRY(DEREF) \
-	AST_TYPE_ENTRY(REF)
+	AST_TYPE_ENTRY(REF) \
+	AST_TYPE_ENTRY(MULTI)
 
 #define AST_TYPE_ENTRY(x) AST_TYPE_##x,
 typedef enum {
@@ -81,6 +82,14 @@ static inline void ast_add_sibling(ast_node_t *t, ast_node_t *n) {
 	t->sibling=n;
 }
 
+
+static inline int ast_is_local(ast_node_t *n) {
+	while (n) {
+		if (n->type==AST_TYPE_FUNCDEF) return 1;
+		n=n->parent;
+	}
+	return 0;
+}
 
 ast_node_t *ast_gen_program_start_node();
 ast_node_t *ast_new_node(ast_type_en type, file_loc_t *loc);

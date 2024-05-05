@@ -1,0 +1,11 @@
+
+
+function test() {
+
+}
+
+function main() {
+//ERROR HERE
+//        v
+    test(main);
+}

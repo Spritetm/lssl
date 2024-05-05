@@ -119,11 +119,10 @@ int run_test(char *code) {
 	} else if (ret==65536*42) {
 		printf("Ran main() succesfully, returned %f\n", ret/65536.0);
 	} else {
-		printf("Ran main, didn't return 42.\n");
+		printf("Ran main() succesfully but it returned %f\n", ret/65536.0);
 		return ERR_RESULT;
 	}
 	lssl_vm_free(vm);
-	vm_syscall_free();
 
 	ast_free_all(prognode);
 	free(bin);
@@ -169,7 +168,10 @@ int main(int argc, char **argv) {
 		"OK", "Test condition malformed", "Expected error did not happen", 
 		"Unexpected compilation error", "Runtime error", "Result did not match expectation"
 	};
+	int ok=0, fail=0;
 	for (int i=0; i<res; i++) {
+		if (errors[i].result==ERR_OK) ok++; else fail++;
 		printf("%s: %s\n", errors[i].file, result_str[errors[i].result]);
 	}
+	printf(" *** Success: %d Fail %d *** \n", ok, fail);
 }

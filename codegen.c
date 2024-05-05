@@ -161,6 +161,8 @@ static void codegen_node(ast_node_t *n) {
 		insert_insn_before_arg_eval(n, INSN_SCOPE_ENTER);
 		codegen(n->children);
 		insert_insn_after_arg_eval(n, INSN_SCOPE_LEAVE, 1);
+	} else if (n->type==AST_TYPE_MULTI) {
+		codegen(n->children);
 	} else if (n->type==AST_TYPE_DROP) {
 		codegen_node(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_POP, 1);
@@ -181,7 +183,7 @@ static void codegen_node(ast_node_t *n) {
 		if (n->returns==AST_RETURNS_ARRAY) {
 			ast_node_t *a=ast_find_type(n->children, AST_TYPE_ARRAYREF);
 			assert(a && "No arrayref in returns->array declare?");
-			ast_node_t *j=insert_insn_before_arg_eval(n, (n->parent)?INSN_LEA:INSN_LEA_G);
+			ast_node_t *j=insert_insn_before_arg_eval(n, ast_is_local(n)?INSN_LEA:INSN_LEA_G);
 			j->value=n;
 			codegen_node(nth_param(a, 1)); //size of the array, in items
 			ast_node_t *i=insert_insn_after_arg_eval(n, INSN_ARRAYINIT, 1);
@@ -189,7 +191,7 @@ static void codegen_node(ast_node_t *n) {
 		} else if (n->returns==AST_RETURNS_STRUCT) {
 			ast_node_t *s=ast_find_type(n->children, AST_TYPE_STRUCTREF);
 			assert(s && "No structref in returns->struct declare?");
-			ast_node_t *j=insert_insn_before_arg_eval(n, (n->parent)?INSN_LEA:INSN_LEA_G);
+			ast_node_t *j=insert_insn_before_arg_eval(n, ast_is_local(n)?INSN_LEA:INSN_LEA_G);
 			j->value=n;
 			ast_node_t *i=insert_insn_before_arg_eval(n, INSN_STRUCTINIT);
 			i->insn_arg=s->size;
@@ -221,9 +223,9 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 1));
 		ast_node_t *i;
 		if (n->value->returns==AST_RETURNS_NUMBER) {
-			i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LEA:INSN_LEA_G);
+			i=insert_insn_before_arg_eval(n, ast_is_local(n->value)?INSN_LEA:INSN_LEA_G);
 		} else {
-			i=insert_insn_before_arg_eval(n, (n->value->parent)?INSN_LDA:INSN_LDA_G);
+			i=insert_insn_before_arg_eval(n, ast_is_local(n->value)?INSN_LDA:INSN_LDA_G);
 		}
 		i->value=n->value;
 		if (n->type==AST_TYPE_DEREF) {

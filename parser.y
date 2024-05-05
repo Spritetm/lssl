@@ -1,6 +1,7 @@
 %{
 #include <stdio.h>
 #include <math.h>
+#include <assert.h>
 #include "lexer.h"
 #include "lexer_gen.h"
 #include "ast.h"
@@ -29,6 +30,15 @@ do                                                        \
         YYRHSLOC(Rhs, 0).pos_end;                         \
     }                                                     \
 while (0)
+
+static void parser_set_structref(ast_node_t *n, char *name) {
+	for (ast_node_t *i=n; i!=NULL; i=i->sibling) {
+		if (i->type==AST_TYPE_STRUCTREF) {
+			i->name=strdup(name);
+		}
+		if (i->children) parser_set_structref(i->children, name);
+	}
+}
 
 %}
 
@@ -80,7 +90,8 @@ field (in which the ast_node now owns the memory) or free()ed here.
 %type<ast> funcdefarg return_statement 
 %type<ast> structdef structmembers structmember 
 %type<ast> dereference array_dereference var_deref var_ref
-%type<ast> vardef vardef_pod vardef_nonpod funccallarg
+%type<ast> vardef vardef_pod vardef_pod_assign vardef_nonpod funccallarg
+%type<ast> vardef_pod_chain vardef_nonpod_chain vardef_pod_assign_maybe
 
 %%
 
@@ -240,27 +251,48 @@ assignment: var_ref TOKEN_ASSIGN expr {
 		ast_add_child($$, $3);
 	}
 
-vardef: TOKEN_VAR TOKEN_STR TOKEN_ASSIGN expr {
+vardef: TOKEN_VAR vardef_pod_chain {
+		$$=ast_new_node(AST_TYPE_MULTI, &@$);
+		ast_add_child($$, $2);
+	}
+| TOKEN_STR vardef_nonpod_chain {
+		$$=ast_new_node(AST_TYPE_MULTI, &@$);
+		//need to fix the structdef value of each declare
+		parser_set_structref($2, $1);
+		free($1);
+		ast_add_child($$, $2);
+	}
+
+vardef_pod_chain: vardef_pod_assign_maybe
+| vardef_pod_chain TOKEN_COMMA vardef_pod_assign_maybe {
+		$$=$1;
+		ast_add_sibling($1, $3);
+	}
+
+vardef_pod_assign_maybe: vardef_pod | vardef_pod_assign
+
+
+vardef_nonpod_chain: vardef_nonpod
+| vardef_nonpod_chain TOKEN_COMMA vardef_nonpod {
+	$$=$1;
+	ast_add_sibling($1, $3);
+}
+
+vardef_pod_assign: TOKEN_STR TOKEN_ASSIGN expr {
 		//ToDo: what if non-pod assignment? (For now, let's not support that.)
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
-		$$->name=$2;
 		$$->size=1;
 		$$->returns=AST_RETURNS_NUMBER;
+		$$->name=$1;
 
 		ast_node_t *a=ast_new_node(AST_TYPE_ASSIGN, &@$);
 		ast_node_t *r=ast_new_node(AST_TYPE_REF, &@$);
 		r->returns=AST_RETURNS_NUMBER;
-		r->name=strdup($2);
+		r->name=strdup($1); //dup because the original already belongs to the DECLARE node
 		ast_add_child(a, r);
-		ast_add_child(a, $4);
+		ast_add_child(a, $3);
 
 		ast_add_child($$, a);
-	}
-| TOKEN_VAR vardef_pod {
-		$$=$2;
-	}
-| vardef_nonpod {
-		$$=$1;
 	}
 
 vardef_pod: TOKEN_STR array_dereference {
@@ -275,18 +307,17 @@ vardef_pod: TOKEN_STR array_dereference {
 		}
 	}
 
-vardef_nonpod: TOKEN_STR TOKEN_STR array_dereference {
+vardef_nonpod: TOKEN_STR array_dereference {
 		$$=ast_new_node(AST_TYPE_DECLARE, &@$);
 		$$->size=1;
-		$$->name=strdup($2);
+		$$->name=strdup($1);
 		ast_node_t *a=ast_new_node(AST_TYPE_STRUCTREF, &@$);
-		a->name=$1;
-		if ($3) {
+		if ($2) {
 			//Need to insert the struct at the end of the array chain
-			ast_node_t *n=ast_find_deepest_arrayref($3);
+			ast_node_t *n=ast_find_deepest_arrayref($2);
 			ast_add_child(n, a);
-			ast_add_child($$, $3);
-			$$->returns=$3->returns;
+			ast_add_child($$, $2);
+			$$->returns=$2->returns;
 		} else {
 			ast_add_child($$, a);
 			$$->returns=AST_RETURNS_STRUCT;
@@ -433,7 +464,6 @@ funccallargs: %empty {
 	}
 | funccallarg {
 		$$=$1;
-		printf("br_term\n");
 	}
 | funccallargs TOKEN_COMMA funccallarg {
 		ast_add_sibling($1, $3);

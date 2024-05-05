@@ -1,0 +1,4 @@
+
+function main(){
+	return 4+(40/2)*2-2;
+}

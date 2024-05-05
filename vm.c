@@ -132,20 +132,10 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_en *error) {
 			push(vm, arg<<16);
 		} else if (op==INSN_PUSH_R) {
 			push(vm, arg);
-/*
-		} else if (op==INSN_RD_VAR) {
-			push(vm, vm->stack[vm->bp+arg]);
-		} else if (op==INSN_WR_VAR) {
-			vm->stack[vm->bp+arg]=pop(vm);
-		} else if (op==INSN_RD_G_VAR) {
-			push(vm, vm->stack[arg]);
-		} else if (op==INSN_WR_G_VAR) {
-			vm->stack[arg]=pop(vm);
-*/
 		} else if (op==INSN_MUL) {
 			int32_t a=pop(vm);
 			int32_t b=pop(vm);
-			int64_t v=(int64_t)a*b;
+			int64_t v=(int64_t)a*(int64_t)b;
 			push(vm, v>>16);
 		} else if (op==INSN_DIV) {
 			int32_t b=pop(vm);

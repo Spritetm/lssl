@@ -49,7 +49,7 @@ static void ast_ops_collate_consts_node(ast_node_t *node) {
 		} else if (node->type==AST_TYPE_MINUS && argct==2) {
 			node->number=arg[0]-arg[1];
 		} else if (node->type==AST_TYPE_TIMES && argct==2) {
-			int64_t v=arg[0]*arg[1];
+			int64_t v=(int64_t)arg[0]*(int64_t)arg[1];
 			node->number=v>>16;
 		} else if (node->type==AST_TYPE_DIVIDE && argct==2) {
 			node->number=(arg[0]*65536.0)/arg[1];
@@ -92,7 +92,9 @@ static ast_node_t *find_symbol(ast_sym_list_t *list, const char *name) {
 	return NULL;
 }
 
-static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_global) {
+//This converts nodes that refer to a symbol by 'name', to nodes that also refer to that
+//symbols declaration by 'value'.
+static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_global, int is_block) {
 	int old_sym_pos=syms->node_pos;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		//Add local vars to list of syms.
@@ -149,11 +151,16 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 			}
 		}
 		//Recursively process sub-nodes
-		if (n->children) annotate_symbols(n->children, syms, 0);
+		if (n->children) {
+			int block=(n->type==AST_TYPE_BLOCK || n->type==AST_TYPE_FUNCDEF);
+			annotate_symbols(n->children, syms, 0, block);
+		}
 	}
-
-	//restore old pos, deleting local var defs
-	syms->node_pos=old_sym_pos;
+	
+	if (is_block) {
+		//restore old pos, deleting local var defs
+		syms->node_pos=old_sym_pos;
+	}
 }
 
 
@@ -173,7 +180,7 @@ void ast_ops_attach_symbol_defs(ast_node_t *node) {
 
 	//Walk the entire program. We add and remove local vars on the fly and add
 	//symbol pointers to var references.
-	annotate_symbols(node, syms, 1);
+	annotate_symbols(node, syms, 1, 1);
 
 	free(syms->nodes);
 	free(syms);
@@ -248,11 +255,30 @@ static int block_place_locals(ast_node_t * node, int start_pos) {
 	int subblk_max_size=0;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
 		if (n->children) {
-			int s=block_place_locals(n->children, pos+start_pos);
-			if (subblk_max_size<s) subblk_max_size=s;
+			if (n->type==AST_TYPE_BLOCK) {
+				int s=block_place_locals(n->children, pos+start_pos);
+				if (subblk_max_size<s) subblk_max_size=s;
+			} else {
+				int s=block_place_locals(n->children, pos+start_pos);
+				pos+=s;
+			}
 		}
 	}
 	return pos+subblk_max_size;
+}
+
+int var_place_globals(ast_node_t *node, int off) {
+	//Find globals
+	int glob_pos=off;
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n->type==AST_TYPE_DECLARE) {
+			n->valpos=glob_pos;
+			glob_pos+=n->size;
+		} else if (n->children && n->type!=AST_TYPE_FUNCDEF) {
+			glob_pos=var_place_globals(n->children, glob_pos);
+		}
+	}
+	return glob_pos;
 }
 
 //Figure out and set the offsets of variables and func args
@@ -264,14 +290,8 @@ void ast_ops_var_place(ast_node_t *node) {
 		}
 	}
 	
-	int glob_pos=0;
-	//Find globals
-	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_DECLARE) {
-			n->valpos=glob_pos;
-			glob_pos+=n->size;
-		}
-	}
+	//Place globals
+	var_place_globals(node, 0);
 	
 	//Find locals, that is enumerate over functions and do space allocation there.
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
@@ -367,6 +387,10 @@ int check_var_type_matches_fn_arg_type(ast_node_t *vardef, ast_node_t *fndef, in
 		return 0;
 	}
 
+	//First, catch function pointers. Function pointers are allowed to syscalls,
+	//but not to normal functions.
+
+	//Next, walk both variable def and function arg def to see if they're the same
 	ast_node_t *n_a=ast_find_type(vardef->children, AST_TYPE_ARRAYREF);
 	ast_node_t *f_a=ast_find_type(fndef->children, AST_TYPE_ARRAYREF);
 	if (n_a && f_a) {
@@ -429,6 +453,13 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 			}
 			if (funcarg) {
 				panic_error(node, "Too many arguments to function '%s'", funcdef->name);
+			}
+			//Check if one of the arguments is a function pointer.
+			if (n->children) {
+				ast_node_t *fa=ast_find_type(n->children, AST_TYPE_FUNCPTR);
+				if (fa) {
+					panic_error(fa, "Function pointer argument to non-syscall function is not allowed.");
+				}
 			}
 		}
 		if (n->children) ast_ops_fix_function_args(n->children);
@@ -588,6 +619,9 @@ static int globals_size(ast_node_t *node) {
 		if (n->type==AST_TYPE_DECLARE) {
 			glob_size+=n->size;
 		}
+		if (n->type!=AST_TYPE_FUNCDEF) {
+			glob_size+=globals_size(n->children);
+		}
 	}
 	return glob_size;
 }
@@ -598,8 +632,10 @@ void ast_ops_add_program_start(ast_node_t *node, const char *main_fn_name) {
 		if (n->type==AST_TYPE_FUNCDEF && strcmp(n->name, main_fn_name)==0) {
 			ast_node_t *d=ast_new_node(AST_TYPE_GOTO, &node->loc);
 			d->name=strdup(main_fn_name);
-			d->sibling=node->sibling;
-			node->sibling=d;
+			//need to put this at end of program
+			ast_node_t *last=node;
+			while (last->sibling) last=last->sibling;
+			last->sibling=d;
 			return;
 		}
 	}
@@ -731,6 +767,27 @@ void ast_ops_annotate_obj_ref_size(ast_node_t *node) {
 }
 
 
+void ast_ops_move_functions_down(ast_node_t *node) {
+	//On the global level, we want all functions on the bottom and all non-functions
+	//(variable declarations, initializers, etc) up top.
+	ast_node_t *last=node;
+	while (last->sibling) last=last->sibling;
+	
+	ast_node_t *orig_last=last;
+	ast_node_t *prev=NULL;
+	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
+		if (n==orig_last) break;
+		if (n->type==AST_TYPE_FUNCDEF) {
+			//Surgery: move to bottom of program
+			prev->sibling=n->sibling; //cut out of list
+			n->sibling=NULL;		  //n is going to be at end of list
+			last->sibling=n;		  //add to end of program
+			last=n;					  //n is now new node
+			n=prev;					  //otherwise we'll loop as n moved
+		}
+		prev=n;
+	}
+}
 
 void ast_ops_add_obj_initializers(ast_node_t *node) {
 	//On the global level, we want to collect all initializers and put them at the very
@@ -775,6 +832,7 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_fix_parents(prognode);
 	ast_ops_var_place(prognode);
 	ast_ops_add_obj_initializers(prognode);
+	ast_ops_move_functions_down(prognode);
 	ast_ops_annotate_obj_decl_size(prognode);
 	ast_ops_annotate_obj_ref_size(prognode);
 	ast_ops_fix_function_args(prognode);

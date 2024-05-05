@@ -5,6 +5,7 @@ parser_gen.h
 lexer.c
 lexer_gen.h
 test
+lssl
 vm
 lssl.js
 lssl.wasm

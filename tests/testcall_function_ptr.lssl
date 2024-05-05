@@ -1,0 +1,6 @@
+
+
+function main() {
+	register_led_cb(main);
+	return 42;
+}
