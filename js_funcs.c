@@ -9,6 +9,7 @@
 #include "codegen.h"
 #include "led_syscalls.h"
 #include "vm.h"
+#include "error.h"
 
 static lssl_vm_t *vm=NULL;
 static uint8_t *program;
@@ -17,11 +18,15 @@ void init() {
 	led_syscalls_init();
 }
 
+ast_node_t *last_ast=NULL;
+
 void recompile(char *code) {
 	if (vm) {
 		lssl_vm_free(vm);
 		vm=NULL;
 	}
+
+	ast_free_all(last_ast);
 
 	yyscan_t myscanner;
 	yylex_init(&myscanner);
@@ -38,11 +43,18 @@ void recompile(char *code) {
 //	yy_delete_buffer(YY_CURRENT_BUFFER, myscanner);
 	yylex_destroy(myscanner);
 
-	ast_free_all(prognode);
 
+	last_ast=prognode;
 	vm=lssl_vm_init(program, bin_len, 1024);
 	vm_error_t vm_err={};
 	lssl_vm_run_main(vm, &vm_err);
+}
+
+int check_and_report_vm_error(vm_error_t *err) {
+	if (err->type==LSSL_VM_ERR_NONE) return 0;
+	const file_loc_t *loc=ast_lookup_loc_for_pc(last_ast, err->pc);
+	yyerror(loc, &last_ast, NULL, "Runtime error '%s'", vm_err_to_str(err->type));
+	return 1;
 }
 
 uint8_t rgb[3];
@@ -52,14 +64,18 @@ uint8_t *get_led(int pos, float t) {
 		rgb[0]=0; rgb[1]=0; rgb[2]=128;
 		return rgb;
 	}
-	if (!led_syscalls_calculate_led(vm, pos, t)) return NULL;
+	vm_error_t err;
+	led_syscalls_calculate_led(vm, pos, t, &err);
+	if (check_and_report_vm_error(&err)) return NULL;
 	led_syscalls_get_rgb(&rgb[0], &rgb[1], &rgb[2]);
 	return rgb;
 }
 
 void frame_start() {
 	if (!vm) return;
-	led_syscalls_frame_start(vm);
+	vm_error_t err;
+	led_syscalls_frame_start(vm, &err);
+	check_and_report_vm_error(&err);
 }
 
 #define CLASS_UNK 0

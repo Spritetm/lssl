@@ -46,6 +46,7 @@ SYSCALL_FUNCTION(tan) {
 }
 
 SYSCALL_FUNCTION(rand) {
+	//note this returns a real number
 	return (rand()%(arg[2]-arg[1]))+arg[1];
 }
 
@@ -62,7 +63,7 @@ static const vm_syscall_list_entry_t builtin_syscalls[]={
 	{"sin", syscall_sin, 1}, 
 	{"cos", syscall_cos, 1}, 
 	{"tan", syscall_tan, 1}, 
-	{"rand", syscall_rand, 3},
+	{"rand", syscall_rand, 2},
 	{"dump_stack", syscall_dumpstack, 0}
 };
 

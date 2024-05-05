@@ -1,0 +1,51 @@
+struct part_t {
+	var pos;
+	var speed;
+	var r;
+	var g;
+	var b;	
+};
+
+part_t part[100];
+
+function update_part(part_t p) {
+	p.pos=p.pos+p.speed;
+	if (p.pos<=0 || p.pos>100) {
+		p.pos=rand(0, 100);
+		p.speed=rand(0.1, 2);
+		if (rand(0, 2)>1) {
+			p.speed=0-p.speed;
+		}
+		p.r=rand(0, 255);
+		p.g=rand(0, 255);
+		p.b=rand(0, 255);
+	}
+}
+
+
+function frame_start() {
+	for (var x=0; x<100; x++) update_part(part[x]);
+}
+
+
+function set_led(pos, time){
+	var r=0, g=0, b=0;
+	for (var x=0; x<100; x++) {
+		if (abs(part[x].pos-x)<2) {
+			r=part[x].r;
+			g=part[x].g;
+			b=part[x].b;
+		}
+		led_set_rgb(r, g, b);
+	}
+}
+
+
+function main() {
+	register_led_cb(set_led);
+	register_frame_start_cb(frame_start);
+	frame_start();
+	set_led(0,0);
+	return 42;
+}
+

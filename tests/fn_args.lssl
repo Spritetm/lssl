@@ -1,0 +1,16 @@
+
+struct a_t {
+	var x;
+	var y;
+}
+
+function test(a_t a) {
+	return a.x+a.y;
+}
+
+function main() {
+	a_t a;
+	a.x=40;
+	a.y=2;
+	return test(a);
+}

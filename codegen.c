@@ -166,7 +166,7 @@ static void codegen_node(ast_node_t *n) {
 	} else if (n->type==AST_TYPE_FUNCDEFARG) {
 		//na
 	} else if (n->type==AST_TYPE_FUNCCALL) {
-		codegen(n->children);
+		if (n->children) codegen(n->children);
 		ast_node_t *i=insert_insn_after_all_arg_eval(n, INSN_CALL);
 		//note: this is the node of the fn, not of the 1st instr. We assign
 		//that node the correct addr later.
@@ -188,10 +188,14 @@ static void codegen_node(ast_node_t *n) {
 		codegen_node(nth_param(n, 1));
 		codegen_node(nth_param(n, 2));
 		insert_insn_after_arg_eval(n, INSN_WR_VAR, 2);
-	} else if (n->type==AST_TYPE_POST_ADD || n->type==AST_TYPE_PRE_ADD) {
+	} else if (n->type==AST_TYPE_POST_ADD) {
 		codegen_node(nth_param(n, 1));
-		ast_node_t *i=insert_insn_after_arg_eval(n, n->type==AST_TYPE_POST_ADD?INSN_POST_ADD:INSN_PRE_ADD, 1);
-		i->insn_arg=n->number>>16;
+		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_POST_ADD, 1);
+		i->insn_arg=n->number;
+	} else if (n->type==AST_TYPE_PRE_ADD) {
+		codegen_node(nth_param(n, 1));
+		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_PRE_ADD, 1);
+		i->insn_arg=n->number;
 	} else if (n->type==AST_TYPE_RETURN) {
 		codegen_node(nth_param(n, 1));
 		insert_insn_after_arg_eval(n, INSN_RETURN, 1);

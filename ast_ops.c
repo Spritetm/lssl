@@ -103,10 +103,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 		} else if (n->type==AST_TYPE_FUNCDEFARG) {
 			add_sym(syms, n);
 		} else if (n->type==AST_TYPE_DEREF || 
-					n->type==AST_TYPE_REF ||
-					n->type==AST_TYPE_POST_ADD ||
-					n->type==AST_TYPE_PRE_ADD
-					) {
+					n->type==AST_TYPE_REF) {
 			//Find variable symbol and resolve
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (!s) {
@@ -373,17 +370,18 @@ ast_node_t *get_deref_return_type(ast_node_t *node) {
 	return find_deref_return_type(node, node->value, 1);
 }
 
-int ast_ops_node_is_pod(ast_node_t *node) {
+int ast_ops_decl_node_is_pod(ast_node_t *node) {
 	ast_node_t *n_a=ast_find_type(node->children, AST_TYPE_ARRAYREF);
 	ast_node_t *n_s=ast_find_type(node->children, AST_TYPE_STRUCTMEMBER);
-	return (!n_a && !n_s);
+	ast_node_t *n_sr=ast_find_type(node->children, AST_TYPE_STRUCTREF);
+	return (!n_a && !n_s && !n_sr);
 }
 
 int check_var_type_matches_fn_arg_type(ast_node_t *vardef, ast_node_t *fndef, int initial_array_var) {
 	//Matches if both are PODs. Does not match if one is but the other isn't.
-	if (ast_ops_node_is_pod(vardef)) {
-		return ast_ops_node_is_pod(fndef);
-	} else if (ast_ops_node_is_pod(fndef)) {
+	if (ast_ops_decl_node_is_pod(vardef)) {
+		return ast_ops_decl_node_is_pod(fndef);
+	} else if (ast_ops_decl_node_is_pod(fndef)) {
 		return 0;
 	}
 
@@ -431,14 +429,14 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 			ast_node_t *funcarg=ast_find_type(n->children, AST_TYPE_DEREF);
 			while (funcarg && funcdefarg) {
 				//Check if arguments have the same type.
-				//Also, if argument is a POD, we need to modify the DEREF to REF.
+				//Also, if argument is not a POD, we need to modify the DEREF to REF.
 				for (ast_node_t *i=n->children; i!=NULL; i=i->sibling) {
 					if (i->type==AST_TYPE_DEREF) {
 						ast_node_t *d_t=get_deref_return_type(i);
 						if (!check_var_type_matches_fn_arg_type(d_t, funcdefarg, 1)) {
 							panic_error(n, "Function arg doesn't match type defined by function declaration!");
 						}
-						if (!ast_ops_node_is_pod(d_t)) {
+						if (!ast_ops_decl_node_is_pod(d_t)) {
 							i->type=AST_TYPE_REF;
 						}
 					}
@@ -589,28 +587,6 @@ static void add_long_prog(prog_t *p, uint32_t b) {
 	add_word_prog(p, (b>>16)&0xffff);
 }
 
-static void gen_binary(ast_node_t *node, prog_t *p) {
-	for (ast_node_t *i=node; i!=NULL; i=i->sibling) {
-		if (i->type==AST_TYPE_INSN) {
-			int size=lssl_vm_argtypes[lssl_vm_ops[i->insn_type].argtype].byte_size;
-			if (size!=0) {
-				add_byte_prog(p, i->insn_type);
-				if (size==1) {
-					//no args
-				} else if (size==2) {
-					add_byte_prog(p, i->insn_arg);
-				} else if (size==3) {
-					add_word_prog(p, i->insn_arg);
-				} else if (size==5) {
-					add_long_prog(p, i->insn_arg);
-				} else {
-					assert(0 && "Invalid byte size for insn type");
-				}
-			}
-		}
-		if (i->children) gen_binary(i->children, p);
-	}
-}
 
 static int globals_size(ast_node_t *node) {
 	//Find globals first.
@@ -804,6 +780,29 @@ void ast_ops_add_obj_initializers(ast_node_t *node) {
 		}
 		//save for next iteration
 		prev=n;
+	}
+}
+
+static void gen_binary(ast_node_t *node, prog_t *p) {
+	for (ast_node_t *i=node; i!=NULL; i=i->sibling) {
+		if (i->type==AST_TYPE_INSN) {
+			int size=lssl_vm_argtypes[lssl_vm_ops[i->insn_type].argtype].byte_size;
+			if (size!=0) {
+				add_byte_prog(p, i->insn_type);
+				if (size==1) {
+					//no args
+				} else if (size==2) {
+					add_byte_prog(p, i->insn_arg);
+				} else if (size==3) {
+					add_word_prog(p, i->insn_arg);
+				} else if (size==5) {
+					add_long_prog(p, i->insn_arg);
+				} else {
+					assert(0 && "Invalid byte size for insn type");
+				}
+			}
+		}
+		if (i->children) gen_binary(i->children, p);
 	}
 }
 

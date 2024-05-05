@@ -220,8 +220,9 @@ funcdefargs: %empty {
 		$$=$1;
 	}
 
-funcdefarg: vardef_nonpod {
-		$$=$1;
+funcdefarg: TOKEN_STR vardef_nonpod {
+		$$=$2;
+		parser_set_structref($2, $1);
 		$$->type=AST_TYPE_FUNCDEFARG;
 	}
 | vardef_pod {
@@ -449,25 +450,25 @@ term: TOKEN_NUMBER {
 		$$->returns=AST_RETURNS_CONST;
 	}
 | var_deref
-| var_deref TOKEN_PLUSPLUS {
+| var_ref TOKEN_PLUSPLUS {
 		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);
 		$$->number=(1<<16);
 		ast_add_child($$, $1);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
-| var_deref TOKEN_MINUSMINUS {
+| var_ref TOKEN_MINUSMINUS {
 		$$=ast_new_node(AST_TYPE_POST_ADD, &@$);
 		$$->number=-(1<<16);
 		ast_add_child($$, $1);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
-| TOKEN_PLUSPLUS var_deref  {
+| TOKEN_PLUSPLUS var_ref  {
 		$$=ast_new_node(AST_TYPE_PRE_ADD, &@$);
 		$$->number=(1<<16);
 		ast_add_child($$, $2);
 		$$->returns=AST_RETURNS_NUMBER;
 	}
-| TOKEN_MINUSMINUS var_deref  {
+| TOKEN_MINUSMINUS var_ref  {
 		$$=ast_new_node(AST_TYPE_PRE_ADD, &@$);
 		$$->number=-(1<<16);
 		ast_add_child($$, $2);

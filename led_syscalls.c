@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include "vm_syscall.h"
 #include "led_syscalls.h"
+#include "error.h"
+#include "vm.h"
 
 static int32_t led_cb_handle=0;
 static int32_t frame_start_cb_handle=0;
@@ -37,25 +39,13 @@ void led_syscalls_init() {
 	vm_syscall_add_local_syscalls(led_syscalls, sizeof(led_syscalls)/sizeof(vm_syscall_list_entry_t));
 }
 
-int led_syscalls_frame_start(lssl_vm_t *vm) {
-	vm_error_t error={};
-	lssl_vm_run_function(vm, led_cb_handle, 0, NULL, &error);
-	if (error.type) {
-		printf("frame_start vm error %s\n", vm_err_to_str(error.type));
-		return 0;
-	}
-	return 1;
+void led_syscalls_frame_start(lssl_vm_t *vm, vm_error_t *error) {
+	lssl_vm_run_function(vm, led_cb_handle, 0, NULL, error);
 }
 
-int led_syscalls_calculate_led(lssl_vm_t *vm, int32_t led, float time) {
-	vm_error_t error={};
+void led_syscalls_calculate_led(lssl_vm_t *vm, int32_t led, float time, vm_error_t *error) {
 	int32_t args[2]={led<<16, (time*65536)};
-	lssl_vm_run_function(vm, led_cb_handle, 2, args, &error);
-	if (error.type) {
-		printf("calculate_led vm error %s\n", vm_err_to_str(error.type));
-		return 0;
-	}
-	return 1;
+	lssl_vm_run_function(vm, led_cb_handle, 2, args, error);
 }
 
 void led_syscalls_get_rgb(uint8_t *r, uint8_t *g, uint8_t *b) {

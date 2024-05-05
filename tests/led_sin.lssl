@@ -1,0 +1,17 @@
+function set_led(pos, time) {
+	var a=pos*0.01+time*0.1;
+	var r=sin(a)*127+128;
+	var g=sin(a+2.1)*127+128;
+	var b=sin(a+4.2)*127+128;
+	led_set_rgb(r, g, b);
+}
+
+function main() {
+	set_led(0, 0);
+	set_led(0, 0);
+	set_led(0, 0);
+	set_led(0, 0);
+	register_led_cb(set_led);
+	return 42;
+}
+

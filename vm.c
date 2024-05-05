@@ -232,6 +232,16 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 			int32_t b=pop(vm);
 			int32_t a=pop(vm);
 			push(vm, (a>=b)?(1<<16):0);
+		} else if (op==INSN_POST_ADD) {
+			int32_t addr=pop(vm);
+			assert(size_from_addr(addr)==1 && "Huh? POST_ADD to addr with size != 1");
+			push(vm, vm->stack[pos_from_addr(addr)]);
+			vm->stack[pos_from_addr(addr)]+=arg;
+		} else if (op==INSN_PRE_ADD) {
+			int32_t addr=pop(vm);
+			assert(size_from_addr(addr)==1 && "Huh? POST_ADD to addr with size != 1");
+			vm->stack[pos_from_addr(addr)]+=arg;
+			push(vm, vm->stack[pos_from_addr(addr)]);
 		} else if (op==INSN_SYSCALL) {
 			int args=vm_syscall_arg_count(arg);
 			assert(args<=8);
