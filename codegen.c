@@ -162,11 +162,21 @@ static void codegen_node(ast_node_t *n) {
 		j->value=l;
 		k->value=i;
 	} else if (n->type==AST_TYPE_IF) {
+		ast_node_t *else_node=nth_param(n, 3);
 		codegen_node_pod(nth_param(n, 1)); //condition
-		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_JZ, 1);
+		ast_node_t *i=insert_insn_after_arg_eval(n, INSN_JZ, 1); //conditional jmp
 		codegen_node(nth_param(n, 2)); //body
-		ast_node_t *j=insert_insn_after_arg_eval(n, INSN_NOP, 2);
-		i->value=j;
+		if (else_node) {
+			codegen_node(else_node); //else body
+			ast_node_t *k=insert_insn_after_arg_eval(n, INSN_JMP, 2); //jump to end
+			ast_node_t *j=insert_insn_after_arg_eval(n, INSN_NOP, 2); //conditional jmp target
+			i->value=j;
+			ast_node_t *l=insert_insn_after_arg_eval(n, INSN_NOP, 3); //end tgt
+			k->value=l;
+		} else {
+			ast_node_t *j=insert_insn_after_arg_eval(n, INSN_NOP, 2); //conditional jmp target
+			i->value=j;
+		}
 	} else if (n->type==AST_TYPE_WHILE) {
 		ast_node_t *h=insert_insn_before_arg_eval(n, INSN_NOP);
 		codegen_node_pod(nth_param(n, 1)); //condition

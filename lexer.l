@@ -72,6 +72,7 @@ hexdigit	[0-9A-Fa-f]
 "for"					{ return TOKEN_FOR;			}
 "while"					{ return TOKEN_WHILE;		}
 "if"					{ return TOKEN_IF;			}
+"else"					{ return TOKEN_ELSE;		}
 "function"				{ return TOKEN_FUNCTION;	}
 "return"				{ return TOKEN_RETURN;		}
 "struct"				{ return TOKEN_STRUCT;		}

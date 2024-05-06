@@ -55,7 +55,7 @@ static void parser_set_structref(ast_node_t *n, char *name) {
 %token TOKEN_STR
 %token TOKEN_CURLOPEN TOKEN_CURLCLOSE
 %token TOKEN_SQBOPEN TOKEN_SQBCLOSE
-%token TOKEN_FOR TOKEN_WHILE TOKEN_IF
+%token TOKEN_FOR TOKEN_WHILE TOKEN_IF TOKEN_ELSE
 %token TOKEN_FUNCTION
 %token TOKEN_EQ TOKEN_NEQ TOKEN_L TOKEN_G TOKEN_LEQ TOKEN_GEQ
 %token TOKEN_RETURN
@@ -241,6 +241,12 @@ if_statement: TOKEN_IF TOKEN_LPAREN expr TOKEN_RPAREN input_line {
 		ast_add_child($$, $3);
 		ast_add_child($$, $5);
 	}
+| TOKEN_IF TOKEN_LPAREN expr TOKEN_RPAREN input_line TOKEN_ELSE input_line{
+		$$=ast_new_node(AST_TYPE_IF, &@$);
+		ast_add_child($$, $3);
+		ast_add_child($$, $5);
+		ast_add_child($$, $7);
+}
 
 for_statement: TOKEN_FOR TOKEN_LPAREN statement TOKEN_SEMICOLON expr TOKEN_SEMICOLON statement TOKEN_RPAREN input_line {
 		$$=ast_new_node(AST_TYPE_FOR, &@$);

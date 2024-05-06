@@ -431,9 +431,6 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 					// funcdefarg points to the funcarg of the arg in the funcdef
 					if (!check_var_type_matches_fn_arg_type(d_t, funcdefarg, 1)) {
 						panic_error(n, "Function arg %d doesn't match type defined by function declaration!", argct);
-						ast_dump(funcarg);
-						ast_dump(d_t);
-						ast_dump(funcdefarg);
 					}
 					if (!ast_ops_decl_node_is_pod(d_t)) {
 						funcarg->type=AST_TYPE_REF;

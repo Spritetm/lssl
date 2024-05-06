@@ -1,10 +1,17 @@
 
 function main() {
+	var x;
 	if (0) {
 		return 1;
 	}
 	if (0) return 2;
 	if (1) {
+		x=1;
+	} else return 3;
+
+	if (0) {
+		return 4;
+	} else {
 		return 42;
 	}
 }
