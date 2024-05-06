@@ -27,19 +27,30 @@
 }
 
 #code_text > .compile_error {
+	display: inline;
+	position: relative;
 	text-decoration: underline wavy red;
 }
 
-.compile_error:before {
-	content: attr(data-error);
+#code_text > .compile_error > .compile_error_tooltip {
 	position: absolute;
-	display: none;
-	background:#FFFF80;
-	border: 1px solid black;
-	margin-top: 1em;
-	margin-left: 1em;
+	display: block;
+	visibility: hidden;
 }
 
-.compile_error:hover:before {
-	display:block;
+#code_text > .compile_error > .compile_error_tooltip:after {
+	content: attr(data-error);
+	position: absolute;
+	display: block;
+	visibility: hidden;
+	background:#FFFF80;
+	border: 1px solid black;
+	margin-top: -1.5em;
+	margin-left: 1em;
+	padding: 2px;
 }
+
+#code_text > .compile_error:hover > .compile_error_tooltip:after {
+	visibility: visible;
+}
+

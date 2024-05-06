@@ -336,7 +336,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 	vm->bp=vm->sp;
 	vm->ap=vm->sp;
 	int32_t v=lssl_vm_run(vm, error);
-	if (old_sp!=vm->sp) {
+	if (error->type==LSSL_VM_ERR_NONE && old_sp!=vm->sp) {
 		printf("Aiee! SP before and after calling fn doesn't match. Before 0x%X after 0x%X\n", old_sp, vm->sp);
 		error->type=LSSL_VM_ERR_INTERNAL;
 	}

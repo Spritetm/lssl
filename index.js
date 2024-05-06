@@ -211,7 +211,6 @@ function syntax_highlight() {
 	for (let e of err) {
 		var span=document.createElement('span');
 		span.classList.add("compile_error");
-		span.setAttribute("data-error", e["msg"]);
 		e["span"]=span;
 	}
 	
@@ -233,22 +232,43 @@ function syntax_highlight() {
 	//add any remaining text
 	insert_txtnode_or_error(hltext, code_text, txtpos, code.lenght, err, "plain");
 
+	//Add tooltip with actual error
+	for (let e of err) {
+		var div=document.createElement('div');
+		div.classList.add("compile_error_tooltip");
+		//Note: we set the error as an attribute and use css to insert the text, because
+		//otherwise code.textContent will return the error as part of the code.
+		div.setAttribute("data-error", e["msg"]);
+		e["span"].appendChild(div);
+	}
+
 	document.querySelector("#code_text").replaceChildren(...hltext);
 }
 
+function check_show_errors() {
+	if (compile_errors.length==0) return false;
+	const code = document.querySelector("#code_text");
+	var off=get_sel_pos(code);
+	syntax_highlight();
+	set_sel_to(code, off);
+	clearInterval(led_timer);
+	led_timer=null;
+	return true;
+}
 
 function led_tick() {
 	const canvas = document.querySelector("#leds");
 	const ctx = canvas.getContext("2d");
 
 	Module.ccall('frame_start', '', [], []);
+	if (check_show_errors()) return;
 	for (var i=0; i<100; i++) {
 		var leds_ptr=Module.ccall("get_led", "number", ["int", "float"], [i, led_time]);
+		check_show_errors();
 		if (leds_ptr==0) {
 			//vm exec error, stop running
+			//note check_show_errors should already have unloaded the timer
 			console.log("VM ran into a runtime error. Stopping.");
-			clearInterval(led_timer);
-			led_timer=null;
 			break;
 		}
 		var r=Module.HEAPU8[leds_ptr+0];
