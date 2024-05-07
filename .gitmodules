@@ -1,0 +1,3 @@
+[submodule "example/components/esp32-wifi-manager"]
+	path = example/components/esp32-wifi-manager
+	url = https://github.com/Spritetm/esp32-wifi-manager

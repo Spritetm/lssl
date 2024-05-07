@@ -4,7 +4,7 @@ SRC_LSSL = lssl.c error.c
 SRC_TEST = test.c
 SRC_JS = js_funcs.c
 
-SRC_ALL = $(SRC_BASE) $(SRC_TEST) $(SRC_JS)
+SRC_ALL = $(SRC_BASE) $(SRC_TEST) $(SRC_JS) $(SRC_LSSL)
 DEPFLAGS = -MT $@ -MMD -MP
 
 CFLAGS=-ggdb -Wall $(DEPFLAGS)
@@ -35,6 +35,6 @@ clean:
 	rm -f $(SRC_ALL:.c=.o) 
 	rm -f $(SRC_ALL:.c=.d) 
 	rm -f parser.c parser_gen.h lexer.c lexer_gen.h
-
+	rm -f lssl test lssl.wasm lssl.wasm.map lssl.js
 
 -include $(SRC_ALL:.c=.d)

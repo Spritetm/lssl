@@ -12,7 +12,7 @@
 #include "vm_syscall.h"
 #include "vm.h"
 
-#define TEST_DIR "tests"
+#define TEST_DIR "../tests"
 
 #define ERR_OK 0
 #define ERR_TEST_ERR 1
@@ -163,10 +163,26 @@ typedef struct {
 } result_t;
 
 int main(int argc, char **argv) {
+	const char *testdir=TEST_DIR;
+	int error=0;
+	for (int i=1; i<argc; i++) {
+		if (strcmp(argv[i],"-t")==0 && argc>i+1) {
+			i++;
+			testdir=argv[i];
+		} else {
+			error=1;
+		}
+	}
+	if (error) {
+		printf("Usage: %s [-t testdir]\n", argv[0]);
+		printf("Compiles and runs all the tests in the given testdir.\n");
+		printf("  -t testdir: Specify custom testdir (default %s)\n", TEST_DIR);
+		exit(1);
+	}
 	result_t errors[1024];
-	DIR *dir=opendir(TEST_DIR);
+	DIR *dir=opendir(testdir);
 	if (!dir) {
-		perror(TEST_DIR);
+		perror(testdir);
 		exit(1);
 	}
 	led_syscalls_init();
@@ -176,7 +192,7 @@ int main(int argc, char **argv) {
 	while ((de=readdir(dir))) {
 		if (strlen(de->d_name)>5 && strcmp(&de->d_name[strlen(de->d_name)-5], ".lssl")==0) {
 			char filename[512];
-			snprintf(filename, sizeof(filename), "%s/%s", TEST_DIR, de->d_name);
+			snprintf(filename, sizeof(filename), "%s/%s", testdir, de->d_name);
 			printf("Testing %s ...\n", filename);
 			FILE *f=fopen(filename, "r");
 			if (!f) {
