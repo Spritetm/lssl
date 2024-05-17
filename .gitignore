@@ -4,7 +4,8 @@ src/parser.c
 src/parser_gen.h
 src/lexer.c
 src/lexer_gen.h
-lssl.js
-lssl.wasm
-lssl.wasm.map
+src/lssl.js
+src/lssl.wasm
+src/lssl.wasm.map
+sdkconfig
 

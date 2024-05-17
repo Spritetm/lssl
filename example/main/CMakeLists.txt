@@ -1,3 +1,4 @@
-set(COMPONENT_SRCS "main.c")
 
-register_component()
+idf_component_register(SRCS "main.c"
+        EMBED_FILES root.html root.css
+)

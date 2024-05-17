@@ -5,7 +5,6 @@
 #include <string.h>
 #include "vm_defs.h"
 #include "ast.h"
-#include "insn.h"
 
 
 static void dump_insn(ast_node_t *node) {

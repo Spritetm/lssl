@@ -1,6 +1,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <assert.h>
+#include <inttypes.h>
 #include "vm_defs.h"
 #include "vm_syscall.h"
 #include "vm.h"
@@ -111,7 +112,7 @@ inline static int size_from_addr(uint32_t addr) {
 
 //Runs until error, or until we return to address -1.
 int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
-	int32_t ret;
+	int32_t ret=0;
 	vm->error=0;
 	while(vm->error==LSSL_VM_ERR_NONE) {
 		int new_pc=vm->pc;
@@ -325,7 +326,7 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 }
 
 int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_t *argv, vm_error_t *error) {
-	int32_t old_sp=vm->sp;
+	int old_sp=vm->sp;
 	//push the arguments
 	for (int i=0; i<argc; i++) push(vm, argv[i]);
 	//fake call
@@ -337,7 +338,7 @@ int32_t lssl_vm_run_function(lssl_vm_t *vm, uint32_t fn_handle, int argc, int32_
 	vm->ap=vm->sp;
 	int32_t v=lssl_vm_run(vm, error);
 	if (error->type==LSSL_VM_ERR_NONE && old_sp!=vm->sp) {
-		printf("Aiee! SP before and after calling fn doesn't match. Before 0x%X after 0x%X\n", old_sp, vm->sp);
+		printf("Aiee! SP before and after calling fn doesn't match. Before 0x%x after 0x%x\n", old_sp, vm->sp);
 		error->type=LSSL_VM_ERR_INTERNAL;
 	}
 	return v;
@@ -347,7 +348,7 @@ void lssl_vm_dump_stack(lssl_vm_t *vm) {
 	printf("SP %x BP %x AP %x\n", vm->sp, vm->bp, vm->ap);
 	printf("Addr\tValue\n");
 	for (int i=0; i<vm->sp; i++) {
-		printf("%04x\t%08x", i, vm->stack[i]);
+		printf("%04x\t%08"PRIx32, i, vm->stack[i]);
 		if (i==vm->bp) printf(" <-BP");
 		if (i==vm->ap) printf(" <-AP");
 		printf("\n");

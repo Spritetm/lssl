@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <stdio.h>
+#include <inttypes.h>
 #include "vm_syscall.h"
 #include "led_syscalls.h"
 #include "error.h"
@@ -10,13 +11,11 @@ static int32_t frame_start_cb_handle=-1;
 static int32_t cur_led_col[3];
 
 int32_t register_led_cb(lssl_vm_t *vm, int32_t *args, int argct) {
-	printf("register_led_cb: %d\n", args[0]);
 	led_cb_handle=args[0];
 	return 0;
 }
 
 int32_t register_frame_start_cb(lssl_vm_t *vm, int32_t *args, int argct) {
-	printf("register_frame_start_cb: %d\n", args[0]);
 	frame_start_cb_handle=args[0];
 	return 0;
 }

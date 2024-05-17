@@ -1,7 +1,7 @@
 #pragma once
 #include <stdint.h>
 #include "file_loc.h"
-#include "insn.h"
+#include "vm_defs.h"
 
 typedef struct ast_node_t ast_node_t;
 

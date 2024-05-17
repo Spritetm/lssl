@@ -1,11 +1,11 @@
-set(SRC "src/insn.c" "src/led_syscalls.c" "src/vm.c" "src/vm_defs.c" "src/vm_syscall.c"
-		"idf_bindings/web.c"
-		"${BUILD_DIR}/parser.c" "${BUILD_DIR}/lexer.c")
+set(SRC "src/led_syscalls.c" "src/vm.c" "src/vm_defs.c" "src/vm_syscall.c"
+		"idf_bindings/lssl_idf_web.c" "${BUILD_DIR}/parser.c" "${BUILD_DIR}/lexer.c")
 
-idf_component_register(SRC ${SRC}
-        INCLUDE_DIRS src/
+idf_component_register(SRCS ${SRC}
+        INCLUDE_DIRS src/ idf_bindings/ ${BUILD_DIR}/
         EMBED_FILES web/lssl_edit.html web/lssl_edit.css web/lssl_edit.js
-			${BUILD_DIR}/lssl.js ${BUILD_DIR}/lssl.wasm ${BUILD_DIR}/lssl.wasm.map)
+			${BUILD_DIR}/lssl.js ${BUILD_DIR}/lssl.wasm ${BUILD_DIR}/lssl.wasm.map
+		REQUIRES json esp_http_server nvs_flash)
 
 
 add_custom_command(OUTPUT ${BUILD_DIR}/parser.c ${BUILD_DIR}/parser_gen.h
