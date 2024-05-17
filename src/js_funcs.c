@@ -12,7 +12,6 @@
 #include "error.h"
 
 static lssl_vm_t *vm=NULL;
-static uint8_t *program;
 
 void init() {
 	led_syscalls_init();
@@ -20,7 +19,14 @@ void init() {
 
 ast_node_t *last_ast=NULL;
 
-void recompile(char *code) {
+typedef struct {
+	uint32_t len;
+	uint8_t *program;
+} program_t;
+
+program_t program;
+
+program_t *recompile(char *code) {
 	if (vm) {
 		lssl_vm_free(vm);
 		vm=NULL;
@@ -35,19 +41,21 @@ void recompile(char *code) {
 	ast_node_t *prognode=ast_gen_program_start_node();
 
 	yyparse(&prognode->sibling, myscanner);
-	if (prognode->sibling==NULL) return;
+	if (prognode->sibling==NULL) return NULL;
 	ast_ops_do_compile(prognode);
 
 	int bin_len;
-	program=ast_ops_gen_binary(prognode, &bin_len);
+	program.program=ast_ops_gen_binary(prognode, &bin_len);
+	program.len=bin_len;
 //	yy_delete_buffer(YY_CURRENT_BUFFER, myscanner);
 	yylex_destroy(myscanner);
 
 	led_syscalls_clear();
 	last_ast=prognode;
-	vm=lssl_vm_init(program, bin_len, 1024);
+	vm=lssl_vm_init(program.program, bin_len, 1024);
 	vm_error_t vm_err={};
 	lssl_vm_run_main(vm, &vm_err);
+	return &program;
 }
 
 int check_and_report_vm_error(vm_error_t *err, const char *what) {

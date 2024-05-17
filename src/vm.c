@@ -35,7 +35,10 @@ lssl_vm_t *lssl_vm_init(uint8_t *program, int prog_len, int stack_size_words) {
 	uint32_t glob_sz=get_i32(&program[4]);
 
 	//version needs to match
-	if (ver!=LSSL_VM_VER) return NULL;
+	if (ver!=LSSL_VM_VER) {
+		printf("Version error! Expected %d got %d\n", LSSL_VM_VER, (int)ver);
+		return NULL;
+	}
 	
 	lssl_vm_t *ret=calloc(sizeof(lssl_vm_t), 1);
 	if (!ret) goto error;

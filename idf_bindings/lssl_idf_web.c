@@ -8,6 +8,7 @@
 #include "freertos/task.h"
 #include "freertos/semphr.h"
 #include "nvs.h"
+#include "lssl_idf_web.h"
 
 #define NVS_NAMESPACE "lssl_progs"
 
@@ -28,19 +29,33 @@ typedef esp_err_t (*web_cb_t)(httpd_req_t *req);
 
 static esp_err_t (*lssl_custom_get_httpd_uri_handler)(httpd_req_t *r) = NULL;
 static esp_err_t (*lssl_custom_post_httpd_uri_handler)(httpd_req_t *r) = NULL;
+static program_changed_cb_t program_changed_cb=NULL;
+
+void lssl_web_register_program_changed_cb(program_changed_cb_t cb) {
+	program_changed_cb=cb;
+}
 
 static esp_err_t list_programs(httpd_req_t *req) {
 	nvs_handle nvs;
-	ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs));
+	httpd_resp_set_status(req, "200 OK");
+	httpd_resp_set_type(req, "text/json");
+	esp_err_t err=nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs);
+	if (err!=ESP_OK) {
+		httpd_resp_send(req, "[]", 2);
+		return ESP_OK;
+	}
+	ESP_ERROR_CHECK(err);
 	struct cJSON *progs=cJSON_CreateArray();
 	nvs_iterator_t it=NULL;
-	esp_err_t err=nvs_entry_find_in_handle(nvs, NVS_TYPE_BLOB, &it);
+	err=nvs_entry_find_in_handle(nvs, NVS_TYPE_BLOB, &it);
 	while (err==ESP_OK) {
 		nvs_entry_info_t info;
 		nvs_entry_info(it, &info);
 		if (info.key[0]=='p') {
-			struct cJSON *prog=cJSON_CreateString(info.key+1);
-			cJSON_AddItemToArray(progs, prog);
+			struct cJSON *o=cJSON_CreateObject();
+			cJSON_AddStringToObject(o, "name", info.key+1);
+			cJSON_AddBoolToObject(o, "selected", false);
+			cJSON_AddItemToArray(progs, o);
 		}
 		err=nvs_entry_next(&it);
 	}
@@ -48,8 +63,6 @@ static esp_err_t list_programs(httpd_req_t *req) {
 	nvs_close(nvs);
 	char *out=cJSON_Print(progs);
 	cJSON_Delete(progs);
-	httpd_resp_set_status(req, "200 OK");
-	httpd_resp_set_type(req, "text/json");
 	httpd_resp_send(req, out, strlen(out));
 	free(out);
 	return ESP_OK;
@@ -66,17 +79,20 @@ static esp_err_t get_program(httpd_req_t *req) {
 	char name[17]={0};
 	snprintf(name, 16, "p%s", file_in_uri(req->uri));
 
-	nvs_handle nvs;
-	ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs));
+	nvs_handle nvs={};
+	esp_err_t err=nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs);
+	if (err!=ESP_ERR_NVS_NOT_FOUND) {
+		ESP_ERROR_CHECK(err);
+	}
 	size_t req_sz=0;
 	char *prog;
-	if (nvs_get_blob(nvs, name, NULL, &req_sz)==ESP_OK) {
+	if (err!=ESP_ERR_NVS_NOT_FOUND && nvs_get_blob(nvs, name, NULL, &req_sz)==ESP_OK) {
 		prog=calloc(req_sz+1, 1);
 		nvs_get_blob(nvs, name, prog, &req_sz);
 	} else {
 		prog=strdup("//New file\n\n");
 	}
-	nvs_close(nvs);
+	if (nvs) nvs_close(nvs);
 	
 	httpd_resp_set_status(req, "200 OK");
 	httpd_resp_set_type(req, "text/plain");
@@ -90,15 +106,15 @@ static esp_err_t get_program(httpd_req_t *req) {
 static esp_err_t post_save_to_nvs(httpd_req_t *req, const char *name) {
 	int total_len=req->content_len;
 	if (total_len>MAX_FILE_SIZE) {
-		httpd_resp_set_status(req, "507 Insufficient storage");
+		httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "Maximum size exceeded");
 		return ESP_OK;
 	}
-	char *in=calloc(total_len, 1);
+	char *in=calloc(total_len+1, 1);
 	int len=0;
 	while (len<total_len) {
 		int recv=httpd_req_recv(req, in+len, total_len-len);
 		if (recv<=0) {
-			httpd_resp_set_status(req, "500 Internal error");
+			httpd_resp_send_err(req, HTTPD_500_INTERNAL_SERVER_ERROR, "POST receive error");
 			return ESP_OK;
 		}
 		len+=recv;
@@ -106,11 +122,13 @@ static esp_err_t post_save_to_nvs(httpd_req_t *req, const char *name) {
 	
 	nvs_handle nvs;
 	ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs));
-	nvs_set_blob(nvs, name, in, strlen(in));
+	nvs_set_blob(nvs, name, in, len);
 	nvs_close(nvs);
 
 	nvs_close(nvs);
-	httpd_resp_set_status(req, "204 No content");
+	httpd_resp_set_status(req, "200 OK");
+	httpd_resp_set_type(req, "text/plain");
+	httpd_resp_send(req, "", 0);
 	return ESP_OK;
 }
 
@@ -123,7 +141,9 @@ static esp_err_t save_program(httpd_req_t *req) {
 static esp_err_t save_bytecode(httpd_req_t *req) {
 	char name[17]={0};
 	snprintf(name, 16, "b%s", file_in_uri(req->uri));
-	return post_save_to_nvs(req, name);
+	esp_err_t r=post_save_to_nvs(req, name);
+	if (program_changed_cb) program_changed_cb(file_in_uri(req->uri));
+	return r;
 }
 
 typedef struct {
@@ -159,9 +179,9 @@ const web_file_t post_files[]={
 const web_file_t *find_web_file(const web_file_t *files, const char *uri) {
 	const web_file_t *f=files;
 	while (f->uri) {
-		char *ao=strchr(uri, '*');
+		char *ao=strchr(f->uri, '*');
 		if (ao!=NULL) {
-			int len=ao-uri;
+			int len=ao-f->uri;
 			if (strncmp(uri, f->uri, len)==0) break;
 		}
 		if (strcmp(uri, f->uri)==0) break;
@@ -216,3 +236,24 @@ esp_err_t lssl_http_app_set_handler_hook(httpd_method_t method, esp_err_t (*hand
 	return ESP_OK;
 }
 
+uint8_t *lssl_web_get_program(const char *name, size_t *len) {
+	char fname[17];
+	snprintf(fname, 16, "b%s", name);
+
+	nvs_handle nvs={};
+	esp_err_t err=nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs);
+	if (err==ESP_ERR_NVS_NOT_FOUND) return NULL;
+	ESP_ERROR_CHECK(err);
+
+	size_t req_sz=0;
+	uint8_t *prog;
+	if (nvs_get_blob(nvs, fname, NULL, &req_sz)==ESP_OK) {
+		prog=calloc(req_sz+1, 1);
+		nvs_get_blob(nvs, fname, prog, &req_sz);
+		*len=req_sz;
+	} else {
+		prog=NULL;
+	}
+	nvs_close(nvs);
+	return prog;
+}

@@ -3,12 +3,40 @@ var led_time=0;
 var compile_timeout=null;
 var led_timer=null;
 
+var Module = {
+	print: (function(...args) {
+		var text = args.join(' ');
+		console.log(text);
+	}),
+	onRuntimeInitialized: (function() {
+		Module.ccall('init', null, [], []);
+		if (window.location.hash) {
+			fetch("lssl_program/"+window.location.hash.substring(1))
+				.then(response => {
+					if (response.status != 200) throw new Error('Request failed');
+					return response.text();
+				})
+			.then(text => {
+				const code = document.querySelector("#code_text");
+				code.textContent=text;
+				document.querySelector("#code_text").disabled=false;
+				recompile_typed();
+			});
+		} else {
+			var t=localStorage.getItem("code");
+			const code = document.querySelector("#code_text");
+			if (t) code.textContent=t;
+			document.querySelector("#code_text").disabled=false;
+			recompile_typed();
+		}
+	}),
+};
+
+
 window.addEventListener("load", (event) => {
 	const code = document.querySelector("#code_text");
 	code.addEventListener("keydown", code_keypress);
 	code.addEventListener("keyup", code_keyrelease);
-	var t=localStorage.getItem("code");
-	if (t) code.textContent=t;
 });
 
 
@@ -132,9 +160,36 @@ function recompile_typed() {
 	compile_errors=new Array(); //clear errors
 	const code = document.querySelector("#code_text")
 	const code_text=code.textContent;
-	Module.ccall('recompile', 'Uint8Array', ['string'], [code_text]);
+	fetch("lssl_save_program/"+window.location.hash.substring(1), {
+			method: "POST", 
+			headers: {
+				"Content-Type": "text/plain"
+			},
+			body: code_text})
+		.then(response => {
+			if (response.status != 200) throw new Error('Request failed');
+			return response.text();
+			});
 
-	if (compile_errors.length==0) {
+	var pgm=Module.ccall('recompile', 'number', ['string'], [code_text]);
+	if (pgm) {
+		var binlen=getValue(pgm+0, "i32");
+		var binptr=getValue(pgm+4, "*");
+		var vmprog=new Uint8Array(HEAPU8.buffer, binptr, binlen);
+	}
+	
+	if (compile_errors.length==0 && pgm!=0) {
+		//Save compiled bytecode
+		fetch("lssl_save_compiled/"+window.location.hash.substring(1), {
+				method: "POST", 
+				headers: {
+					"Content-Type": "text/plain"
+				},
+				body: vmprog})
+			.then(response => {
+				if (response.status != 200) throw new Error('Request failed');
+				return response.text();
+				});
 		//Start running VM
 		if (led_timer===null) {
 			console.log("Compile succesful. Restarting VM");

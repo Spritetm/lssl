@@ -1,1 +1,51 @@
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Ledstrip controller</title>
+<script type="text/javascript">
+window.addEventListener("load", (event) => {
+	const psel=document.querySelector("#program_sel");
+	psel.addEventListener("change", (event) => {
+		const psel=document.querySelector("#program_sel");
+		const pname=document.querySelector("#program_name");
+		if (psel.value=="") {
+			pname.style.visibility="visible";
+		} else {
+			pname.style.visibility="hidden";
+			fetch("lssl_run/"+psel.value)
+		}
+	});
+	fetch("lssl_list")
+		.then(response => {
+			if (response.status != 200) throw new Error('Request failed');
+			return response.json();
+		})
+		.then(json => {
+			const psel=document.querySelector("#program_sel");
+			while(psel.options.length>0) psel.remove(0);
+			for (const n of json) {
+				psel.appendChild(new Option(n.name, n.name));
+			}
+			psel.appendChild(new Option("New Program", ""));
+		});
+	const pedit=document.querySelector("#program_edit");
+	pedit.addEventListener("click", (event) => {
+			event.preventDefault();
+			const psel=document.querySelector("#program_sel");
+			const pname=document.querySelector("#program_name");
+			if (psel.value=="") {
+                window.location.href = "lssl_edit.html#"+pname.value
+			} else {
+				window.location.href = "lssl_edit.html#"+psel.value
+			}
+		});
+});
+</script>
+</head>
+<body>
+<select name="programs" id="program_sel">
+	<option value="">Loading</option>
+</select>
+<input type="text" id="program_name" value="">
+<input type="submit" id="program_edit" value="Edit">
+</body>
