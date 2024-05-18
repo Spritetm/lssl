@@ -1,5 +1,6 @@
 #include <string.h>
 #include <math.h>
+#include <assert.h>
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "esp_timer.h"
@@ -81,6 +82,7 @@ static size_t encoder_callback(const void *data, size_t data_size,
 QueueHandle_t progq;
 
 void leds_change_program(const char *pgm) {
+	assert(pgm[17]==0);
 	xQueueSend(progq, pgm, portMAX_DELAY);
 }
 
@@ -98,10 +100,12 @@ static void led_task(void *args) {
 	vm_error_t err={};
 	while(1) {
 		if (xQueueReceive(progq, progname, pdMS_TO_TICKS(10))) {
+			assert(progname[16]==0);
 			free(pgm);
 			pgm=lssl_web_get_program(progname, &pgmlen);
 			if (pgm) {
 				if (vm) lssl_vm_free(vm);
+				led_syscalls_clear();
 				vm=lssl_vm_init(pgm, pgmlen, 8192);
 				if (vm) {
 					lssl_vm_run_main(vm, &err);
@@ -121,8 +125,9 @@ static void led_task(void *args) {
 				for (int i=0; i<LED_COUNT; i++) {
 					led_syscalls_calculate_led(vm, i, t, &err);
 					if (err.type!=LSSL_VM_ERR_NONE) break;
-					led_syscalls_get_rgb(&led_strip_pixels[i*3],
-										&led_strip_pixels[i*3+1],
+					//Note the LED-strip is BGR so we swap R and G here.
+					led_syscalls_get_rgb(&led_strip_pixels[i*3+1],
+										&led_strip_pixels[i*3],
 										&led_strip_pixels[i*3+2]);
 					if (err.type!=LSSL_VM_ERR_NONE) break;
 				}

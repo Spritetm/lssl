@@ -124,6 +124,7 @@ static esp_err_t post_save_to_nvs(httpd_req_t *req, const char *name) {
 	ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs));
 	nvs_set_blob(nvs, name, in, len);
 	nvs_close(nvs);
+	ESP_LOGI(TAG, "Saved file %s, size %d bytes", name, len);
 
 	nvs_close(nvs);
 	httpd_resp_set_status(req, "200 OK");

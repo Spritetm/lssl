@@ -11,6 +11,7 @@
 
 EXTERN_FILE(root_html);
 EXTERN_FILE(root_css);
+EXTERN_FILE(favicon_ico);
 
 static esp_err_t get_handler(httpd_req_t *req) {
 	if (strcmp(req->uri, "/root.html")==0 || strcmp(req->uri, "/")==0) {
@@ -23,6 +24,12 @@ static esp_err_t get_handler(httpd_req_t *req) {
 		httpd_resp_set_status(req, "200 OK");
 		httpd_resp_set_type(req, "text/css");
 		httpd_resp_send(req, root_html_start, root_html_length);
+		return ESP_OK;
+	}
+	if (strcmp(req->uri, "/favicon.ico")==0) {
+		httpd_resp_set_status(req, "200 OK");
+		httpd_resp_set_type(req, "image/vnd.microsoft.icon");
+		httpd_resp_send(req, favicon_ico_start, favicon_ico_length);
 		return ESP_OK;
 	}
 	if (strncmp(req->uri, "/lssl_run/", 10)==0) {
