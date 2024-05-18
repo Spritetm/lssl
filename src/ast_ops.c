@@ -862,5 +862,5 @@ void ast_ops_do_compile(ast_node_t *prognode) {
 	ast_ops_assign_addr_to_fndef_node(prognode);
 	ast_ops_fixup_addrs(prognode);
 	ast_ops_fix_parents(prognode);
-	//ast_dump(prognode);
+	ast_dump(prognode);
 }

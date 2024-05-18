@@ -95,8 +95,8 @@ static void led_task(void *args) {
 	lssl_vm_t *vm=NULL;
 
 	led_syscalls_init();
+	vm_error_t err={};
 	while(1) {
-		vm_error_t err;
 		if (xQueueReceive(progq, progname, pdMS_TO_TICKS(10))) {
 			free(pgm);
 			pgm=lssl_web_get_program(progname, &pgmlen);
@@ -114,20 +114,24 @@ static void led_task(void *args) {
 				printf("leds: progname not found!\n");
 			}
 		}
-		if (pgm) {
+		if (pgm && err.type==LSSL_VM_ERR_NONE) {
 			led_syscalls_frame_start(vm, &err);
-			float t=esp_timer_get_time()/1000000.0;
-			for (int i=0; i<LED_COUNT; i++) {
-				led_syscalls_calculate_led(vm, i, t, &err);
-				led_syscalls_get_rgb(&led_strip_pixels[i*3],
-									&led_strip_pixels[i*3+1],
-									&led_strip_pixels[i*3+2]);
+			if (err.type==LSSL_VM_ERR_NONE) {
+				float t=esp_timer_get_time()/1000000.0;
+				for (int i=0; i<LED_COUNT; i++) {
+					led_syscalls_calculate_led(vm, i, t, &err);
+					if (err.type!=LSSL_VM_ERR_NONE) break;
+					led_syscalls_get_rgb(&led_strip_pixels[i*3],
+										&led_strip_pixels[i*3+1],
+										&led_strip_pixels[i*3+2]);
+					if (err.type!=LSSL_VM_ERR_NONE) break;
+				}
+				const rmt_transmit_config_t tx_config = {
+					.loop_count = 0, // no transfer loop
+				};
+				ESP_ERROR_CHECK(rmt_transmit(led_chan, simple_encoder, led_strip_pixels, sizeof(led_strip_pixels), &tx_config));
+				ESP_ERROR_CHECK(rmt_tx_wait_all_done(led_chan, portMAX_DELAY));
 			}
-			const rmt_transmit_config_t tx_config = {
-				.loop_count = 0, // no transfer loop
-			};
-			ESP_ERROR_CHECK(rmt_transmit(led_chan, simple_encoder, led_strip_pixels, sizeof(led_strip_pixels), &tx_config));
-			ESP_ERROR_CHECK(rmt_tx_wait_all_done(led_chan, portMAX_DELAY));
 		}
 	}
 }
