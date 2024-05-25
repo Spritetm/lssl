@@ -7,11 +7,6 @@ function set_led(pos, time) {
 }
 
 function main() {
-	set_led(0, 0);
-	set_led(0, 0);
-	set_led(0, 0);
-	set_led(0, 0);
 	register_led_cb(set_led);
-	return 42;
 }
 

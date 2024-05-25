@@ -10,6 +10,7 @@
 #include "vm.h"
 #include "error.h"
 #include "ast.h"
+#include "compile.h"
 
 void bail_if_vm_err(lssl_vm_t *vm, ast_node_t *prognode, vm_error_t *vm_err) {
 	if (vm_err->type==0) return;
@@ -80,22 +81,11 @@ int main(int argc, char **argv) {
 	}
 
 	led_syscalls_init();
-	yyscan_t myscanner;
-	yylex_init(&myscanner);
-    yy_scan_string(buf, myscanner);
-
-	ast_node_t *prognode=ast_gen_program_start_node();
-
-	yyparse(&prognode->sibling, myscanner);
-	if (!prognode->sibling) {
+	ast_node_t *prognode=lssl_compile(buf);
+	if (!prognode) {
 		printf("Parser found error.\n");
 		exit(1);
 	}
-
-	ast_ops_do_compile(prognode);
-
-//    yy_delete_buffer(YY_CURRENT_BUFFER, myscanner);
-    yylex_destroy(myscanner);
 
 	if (print_ast) {
 		ast_dump(prognode);

@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <stddef.h>
 #include "file_loc.h"
 #include "vm_defs.h"
 

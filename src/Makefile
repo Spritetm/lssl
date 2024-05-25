@@ -1,5 +1,5 @@
 SRC_BASE = lexer.c parser.c vm_defs.c ast.c ast_ops.c codegen.c
-SRC_BASE += led_syscalls.c vm_syscall.c vm.c
+SRC_BASE += led_syscalls.c vm_syscall.c vm.c compile.c
 SRC_LSSL = lssl.c error.c
 SRC_TEST = test.c
 SRC_JS = js_funcs.c

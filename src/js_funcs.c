@@ -10,6 +10,7 @@
 #include "led_syscalls.h"
 #include "vm.h"
 #include "error.h"
+#include "compile.h"
 
 static lssl_vm_t *vm=NULL;
 
@@ -34,21 +35,12 @@ program_t *recompile(char *code) {
 
 	ast_free_all(last_ast);
 
-	yyscan_t myscanner;
-	yylex_init(&myscanner);
-	yy_scan_string(code, myscanner);
-
-	ast_node_t *prognode=ast_gen_program_start_node();
-
-	yyparse(&prognode->sibling, myscanner);
-	if (prognode->sibling==NULL) return NULL;
-	ast_ops_do_compile(prognode);
+	ast_node_t *prognode=lssl_compile(code);
+	if (!prognode) return NULL;
 
 	int bin_len;
 	program.program=ast_ops_gen_binary(prognode, &bin_len);
 	program.len=bin_len;
-//	yy_delete_buffer(YY_CURRENT_BUFFER, myscanner);
-	yylex_destroy(myscanner);
 
 	led_syscalls_clear();
 	last_ast=prognode;
@@ -118,6 +110,7 @@ typedef struct {
 	uint32_t pad;
 } token_t;
 
+//This does the first step (tokenizing) of the compile process manually.
 token_t *tokenize_for_syntax_hl(char *code) {
 	yyscan_t myscanner;
 	yylex_init(&myscanner);

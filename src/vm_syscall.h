@@ -3,6 +3,17 @@
 
 typedef int32_t (vm_syscall_fn_t)(lssl_vm_t *vm, int32_t *args, int argct);
 
+typedef enum {
+	VM_SYSCALL_ARG_SCALAR,
+	VM_SYSCALL_ARG_ARRAY,
+	VM_SYSCALL_ARG_STRUCT
+} vm_syscall_arg_type_en;
+
+typedef struct {
+	 
+} vm_syscall_arg_type_t;
+
+
 typedef struct {
 	const char *name;
 	vm_syscall_fn_t *fn;

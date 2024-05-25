@@ -55,6 +55,8 @@ SYSCALL_FUNCTION(dumpstack) {
 	return 0;
 }
 
+
+
 static const vm_syscall_list_entry_t builtin_syscalls[]={
 	{"abs", syscall_abs, 1}, 
 	{"floor", syscall_floor, 1}, 
