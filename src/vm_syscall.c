@@ -7,55 +7,52 @@
 #include "vm_defs.h"
 #include "vm.h"
 
-#define SYSCALL_FUNCTION(name) static int32_t syscall_##name(lssl_vm_t *vm, int32_t *arg, int argct)
 
-SYSCALL_FUNCTION(abs) {
+LSSL_SYSCALL_FUNCTION(syscall_abs) {
 	if (arg[0]<0) return -arg[0]; else return arg[0];
 }
 
-SYSCALL_FUNCTION(floor) {
+LSSL_SYSCALL_FUNCTION(syscall_floor) {
 	return arg[0]&0xffff0000;
 }
 
-SYSCALL_FUNCTION(ceil) {
+LSSL_SYSCALL_FUNCTION(syscall_ceil) {
 	arg[0]+=0xffff;
 	arg[0]=arg[0]&0xffff0000;
 	return arg[0];
 }
 
-SYSCALL_FUNCTION(clamp) {
+LSSL_SYSCALL_FUNCTION(syscall_clamp) {
 	int r=arg[0];
 	if (r<arg[1]) r=arg[1];
 	if (r>arg[2]) r=arg[2];
 	return r;
 }
 
-SYSCALL_FUNCTION(sin) {
+LSSL_SYSCALL_FUNCTION(syscall_sin) {
 	float f=arg[0]/65536.0;
 	return sin(f)*65536;
 }
 
-SYSCALL_FUNCTION(cos) {
+LSSL_SYSCALL_FUNCTION(syscall_cos) {
 	float f=arg[0]/65536.0;
 	return cos(f)*65536;
 }
 
-SYSCALL_FUNCTION(tan) {
+LSSL_SYSCALL_FUNCTION(syscall_tan) {
 	float f=arg[0]/65536.0;
 	return tan(f)*65536;
 }
 
-SYSCALL_FUNCTION(rand) {
+LSSL_SYSCALL_FUNCTION(syscall_rand) {
 	//note this returns a real number
 	return (rand()%(arg[1]-arg[0]))+arg[0];
 }
 
-SYSCALL_FUNCTION(dumpstack) {
+LSSL_SYSCALL_FUNCTION(syscall_dumpstack) {
 	lssl_vm_dump_stack(vm);
 	return 0;
 }
-
-
 
 static const vm_syscall_list_entry_t builtin_syscalls[]={
 	{"abs", syscall_abs, 1}, 
@@ -72,27 +69,34 @@ static const vm_syscall_list_entry_t builtin_syscalls[]={
 typedef struct syscall_list_t syscall_list_t;
 
 struct syscall_list_t {
+	char *name;
 	int start;
 	int count;
+	const char *header;
 	const vm_syscall_list_entry_t *ent;
 	syscall_list_t *next;
 };
 
 static syscall_list_t syscall_list_builtin={
+	.name="builtin",
 	.start=0,
 	.count=(sizeof(builtin_syscalls)/sizeof(builtin_syscalls[0])),
 	.ent=builtin_syscalls,
+	.header=NULL,
 	.next=NULL
 };
 
 static syscall_list_t *syscall_list_last=&syscall_list_builtin;
 
-void vm_syscall_add_local_syscalls(const vm_syscall_list_entry_t *syscalls, int count) {
+void vm_syscall_add_local_syscalls(const char *name, const vm_syscall_list_entry_t *syscalls, 
+									int count, const char *header) {
 	syscall_list_t *l=calloc(sizeof(syscall_list_t), 1);
+	l->name=strdup(name);
 	l->start=syscall_list_last->start+syscall_list_last->count;
 	l->count=count;
 	l->next=syscall_list_last;
 	l->ent=syscalls;
+	l->header=header;
 	syscall_list_last=l;
 }
 
@@ -109,6 +113,16 @@ int vm_syscall_handle_for_name(const char *name) {
 	return -1;
 }
 
+int vm_syscall_get_info(int idx, const char **name, const char **header) {
+	syscall_list_t *l=syscall_list_last;
+	for (int i=0; i<idx; i++) {
+		if (!l->next) return 0;
+		l=l->next;
+	}
+	*name=l->name;
+	*header=l->header;
+	return 1;
+}
 
 static vm_syscall_list_entry_t const *ent_for_handle(int handle) {
 	syscall_list_t *l=syscall_list_last;
@@ -144,7 +158,11 @@ void vm_syscall_free() {
 	syscall_list_t *l=syscall_list_last;
 	while(l) {
 		syscall_list_t *next=l->next;
-		if (l!=&syscall_list_builtin) free(l);
+		if (l!=&syscall_list_builtin) {
+			free(l->name);
+			free(l);
+		}
 		l=next;
 	}
+	syscall_list_last->next=NULL;
 }

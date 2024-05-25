@@ -37,6 +37,7 @@ program_t *recompile(char *code) {
 
 	ast_node_t *prognode=lssl_compile(code);
 	if (!prognode) return NULL;
+	ast_dump(prognode);
 
 	int bin_len;
 	program.program=ast_ops_gen_binary(prognode, &bin_len);
