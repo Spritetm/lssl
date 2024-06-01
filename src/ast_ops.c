@@ -136,11 +136,11 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 					return;
 				} else {
 					//Yep, syscall. Check if arg count matches.
-					int needed_args=vm_syscall_arg_count(callno);
-					if (argct!=needed_args) {
-						panic_error(n, "Syscall %s requires %d args, %d given", n->name, needed_args, argct);
-						return;
-					}
+//					int needed_args=vm_syscall_arg_count(callno);
+//					if (argct!=needed_args) {
+//						panic_error(n, "Syscall %s requires %d args, %d given", n->name, needed_args, argct);
+//						return;
+//					}
 					//Change node to reflect.
 					n->type=AST_TYPE_SYSCALL;
 					n->valpos=callno;
@@ -170,7 +170,9 @@ void ast_ops_attach_symbol_defs(ast_node_t *node) {
 	//Find global vars and function defs; these should always be accessible, even if the definition
 	//is later than where they're called/invoked.
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_FUNCDEF || n->type==AST_TYPE_DECLARE) {
+		if (n->type==AST_TYPE_FUNCDEF ||
+				n->type==AST_TYPE_DECLARE ||
+				n->type==AST_TYPE_SYSCALLDEF) {
 			add_sym(syms, n);
 		}
 	}

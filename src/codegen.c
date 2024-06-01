@@ -199,6 +199,8 @@ static void codegen_node(ast_node_t *n) {
 		codegen(n->children);
 	} else if (n->type==AST_TYPE_FUNCDEFARG) {
 		//na
+	} else if (n->type==AST_TYPE_SYSCALLDEF) {
+		//na
 	} else if (n->type==AST_TYPE_FUNCCALL) {
 		if (n->children) codegen(n->children);
 		ast_node_t *i=insert_insn_after_all_arg_eval(n, INSN_CALL);

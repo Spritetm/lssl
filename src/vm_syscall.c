@@ -54,16 +54,28 @@ LSSL_SYSCALL_FUNCTION(syscall_dumpstack) {
 	return 0;
 }
 
+
+static const char header[]=
+	"syscalldef abs(x);\n"
+	"syscalldef floor(x);\n"
+	"syscalldef ceil(x);\n"
+	"syscalldef clamp(x, min, max);\n"
+	"syscalldef sin(x);\n"
+	"syscalldef cos(x);\n"
+	"syscalldef tan(x);\n"
+	"syscalldef rand(x);\n"
+	"syscalldef dump_stack();\n";
+
 static const vm_syscall_list_entry_t builtin_syscalls[]={
-	{"abs", syscall_abs, 1}, 
-	{"floor", syscall_floor, 1}, 
-	{"ceil", syscall_ceil, 1}, 
-	{"clamp", syscall_clamp, 2}, 
-	{"sin", syscall_sin, 1}, 
-	{"cos", syscall_cos, 1}, 
-	{"tan", syscall_tan, 1}, 
-	{"rand", syscall_rand, 2},
-	{"dump_stack", syscall_dumpstack, 0}
+	{"abs", syscall_abs}, 
+	{"floor", syscall_floor}, 
+	{"ceil", syscall_ceil}, 
+	{"clamp", syscall_clamp},
+	{"sin", syscall_sin}, 
+	{"cos", syscall_cos}, 
+	{"tan", syscall_tan}, 
+	{"rand", syscall_rand},
+	{"dump_stack", syscall_dumpstack}
 };
 
 typedef struct syscall_list_t syscall_list_t;
@@ -82,7 +94,7 @@ static syscall_list_t syscall_list_builtin={
 	.start=0,
 	.count=(sizeof(builtin_syscalls)/sizeof(builtin_syscalls[0])),
 	.ent=builtin_syscalls,
-	.header=NULL,
+	.header=header,
 	.next=NULL
 };
 
@@ -147,11 +159,10 @@ int vm_syscall_arg_count(int handle) {
 	return ent->argct;
 }
 
-int32_t vm_syscall(lssl_vm_t *vm, int syscall, int32_t *arg, int argct) {
+int32_t vm_syscall(lssl_vm_t *vm, int syscall, int32_t *arg) {
 	const vm_syscall_list_entry_t *ent=ent_for_handle(syscall);
 	assert(ent && "Invalid syscall entry!");
-	assert(ent->argct==argct && "Invalid arg count for syscall!");
-	return ent->fn(vm, arg, argct);
+	return ent->fn(vm, arg);
 }
 
 void vm_syscall_free() {

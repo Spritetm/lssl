@@ -76,6 +76,7 @@ hexdigit	[0-9A-Fa-f]
 "function"				{ return TOKEN_FUNCTION;	}
 "return"				{ return TOKEN_RETURN;		}
 "struct"				{ return TOKEN_STRUCT;		}
+"syscalldef"			{ return TOKEN_SYSCALLDEF;	}
 [a-zA-Z0-9_]+			{ (yylval)->str=strdup(yytext); return TOKEN_STR; }
 
 " "

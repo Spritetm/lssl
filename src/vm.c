@@ -252,7 +252,7 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 			assert(args<=8);
 			int32_t argv[8];
 			for (int i=0; i<args; i++) argv[args-i-1]=pop(vm);
-			push(vm, vm_syscall(vm, arg, argv, args));
+			push(vm, vm_syscall(vm, arg, argv));
 		} else if (op==INSN_DUP) {
 			int32_t v=pop(vm);
 			push(vm, v);

@@ -63,6 +63,7 @@ static void parser_set_structref(ast_node_t *n, char *name) {
 %token TOKEN_STRUCT
 %token TOKEN_LOR TOKEN_LAND TOKEN_BOR TOKEN_BAND TOKEN_BXOR
 %token TOKEN_LNOT TOKEN_BNOT
+%token TOKEN_SYSCALLDEF
 
 %define api.pure full
 %parse-param {ast_node_t **program}
@@ -95,6 +96,7 @@ field (in which the ast_node now owns the memory) or free()ed here.
 %type<ast> dereference array_dereference var_deref var_ref
 %type<ast> vardef vardef_pod vardef_pod_assign vardef_nonpod funccallarg
 %type<ast> vardef_pod_chain vardef_nonpod_chain vardef_pod_assign_maybe
+%type<ast> syscalldef
 
 %%
 
@@ -140,6 +142,7 @@ statement: %empty {
 | stdaloneexpr
 | assignment
 | funcdef
+| syscalldef
 | return_statement
 | structdef
 
@@ -201,6 +204,13 @@ stdaloneexpr: expr {
 		//eval the expr but ignore the result
 		$$=ast_new_node(AST_TYPE_DROP, &@$);
 		$$->children=$1;
+	}
+
+syscalldef: TOKEN_SYSCALLDEF TOKEN_STR TOKEN_LPAREN funcdefargs TOKEN_RPAREN {
+		$$=ast_new_node(AST_TYPE_SYSCALLDEF, &@$);
+		$$->name=$2;
+		$$->returns=AST_RETURNS_NUMBER; //syscalls can only return a number for now
+		if ($4) ast_add_child($$, $4);
 	}
 
 funcdef: TOKEN_FUNCTION TOKEN_STR TOKEN_LPAREN funcdefargs TOKEN_RPAREN TOKEN_CURLOPEN input TOKEN_CURLCLOSE {

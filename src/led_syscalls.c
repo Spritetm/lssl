@@ -29,9 +29,9 @@ LSSL_SYSCALL_FUNCTION(syscall_led_set_rgb) {
 }
 
 static const vm_syscall_list_entry_t led_syscalls[]={
-	{"register_led_cb", syscall_register_led_cb, 1},
-	{"register_frame_start_cb", syscall_register_frame_start_cb, 1},
-	{"led_set_rgb", syscall_led_set_rgb, 3}
+	{"register_led_cb", syscall_register_led_cb},
+	{"register_frame_start_cb", syscall_register_frame_start_cb},
+	{"led_set_rgb", syscall_led_set_rgb}
 };
 
 static const char *led_hdr=
@@ -45,7 +45,10 @@ static const char *led_hdr=
 "	var h;\n"
 "	var s;\n"
 "	var v;\n"
-"}\n";
+"}\n"
+"syscalldef register_led_cb(cb);\n"
+"syscalldef register_frame_start_cb(cb);\n"
+"syscalldef led_set_rgb(r, g, b);\n";
 
 void led_syscalls_init() {
 	vm_syscall_add_local_syscalls("led", led_syscalls, sizeof(led_syscalls)/sizeof(vm_syscall_list_entry_t), led_hdr);
