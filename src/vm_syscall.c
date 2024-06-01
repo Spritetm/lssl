@@ -63,18 +63,18 @@ static const char header[]=
 	"syscalldef sin(x);\n"
 	"syscalldef cos(x);\n"
 	"syscalldef tan(x);\n"
-	"syscalldef rand(x);\n"
+	"syscalldef rand(x, y);\n"
 	"syscalldef dump_stack();\n";
 
 static const vm_syscall_list_entry_t builtin_syscalls[]={
-	{"abs", syscall_abs}, 
-	{"floor", syscall_floor}, 
-	{"ceil", syscall_ceil}, 
-	{"clamp", syscall_clamp},
-	{"sin", syscall_sin}, 
-	{"cos", syscall_cos}, 
-	{"tan", syscall_tan}, 
-	{"rand", syscall_rand},
+	{"abs", syscall_abs, 1}, 
+	{"floor", syscall_floor, 1}, 
+	{"ceil", syscall_ceil, 1}, 
+	{"clamp", syscall_clamp, 3},
+	{"sin", syscall_sin, 1}, 
+	{"cos", syscall_cos, 1}, 
+	{"tan", syscall_tan, 1}, 
+	{"rand", syscall_rand, 2},
 	{"dump_stack", syscall_dumpstack}
 };
 

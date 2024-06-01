@@ -93,7 +93,7 @@ static ast_node_t *find_symbol(ast_sym_list_t *list, const char *name) {
 }
 
 //This converts nodes that refer to a symbol by 'name', to nodes that also refer to that
-//symbols declaration by 'value'.
+//symbols declaration by 'value'. Note that the 1st call will be passed the root node as the arg.
 static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_global, int is_block) {
 	int old_sym_pos=syms->node_pos;
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
@@ -123,33 +123,27 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 
 			ast_node_t *s=find_symbol(syms, n->name);
 			if (s) {
-				if (s->type!=AST_TYPE_FUNCDEF) {
+				if (s->type==AST_TYPE_FUNCDEF) {
+					n->value=s;
+				} else if (s->type==AST_TYPE_SYSCALLDEF) {
+					int callno=vm_syscall_handle_for_name(n->name);
+					if (callno<0 || n->type==AST_TYPE_GOTO) {
+						panic_error(n, "Undefined var/function %s", n->name);
+						return;
+					} else {
+						//Change node to reflect.
+						n->type=AST_TYPE_SYSCALL;
+						n->valpos=callno;
+					}
+				} else {
 					panic_error(n, "Cannot call non-function %s", n->name);
 					return;
-				}
-				n->value=s;
-			} else {
-				//Perhaps it's a syscall?
-				int callno=vm_syscall_handle_for_name(n->name);
-				if (callno<0 || n->type==AST_TYPE_GOTO) {
-					panic_error(n, "Undefined var/function %s", n->name);
-					return;
-				} else {
-					//Yep, syscall. Check if arg count matches.
-//					int needed_args=vm_syscall_arg_count(callno);
-//					if (argct!=needed_args) {
-//						panic_error(n, "Syscall %s requires %d args, %d given", n->name, needed_args, argct);
-//						return;
-//					}
-					//Change node to reflect.
-					n->type=AST_TYPE_SYSCALL;
-					n->valpos=callno;
 				}
 			}
 		}
 		//Recursively process sub-nodes
 		if (n->children) {
-			int block=(n->type==AST_TYPE_BLOCK || n->type==AST_TYPE_FUNCDEF);
+			int block=(n->type==AST_TYPE_BLOCK || n->type==AST_TYPE_FUNCDEF || n->type==AST_TYPE_SYSCALLDEF);
 			annotate_symbols(n->children, syms, 0, block);
 		}
 	}
