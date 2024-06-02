@@ -7,5 +7,7 @@ src/lexer_gen.h
 src/lssl.js
 src/lssl.wasm
 src/lssl.wasm.map
+src/lssl
+src/test
 sdkconfig
 
