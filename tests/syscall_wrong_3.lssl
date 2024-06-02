@@ -1,0 +1,6 @@
+
+function main() {
+//ERROR HERE
+//   v
+   sin(1,2);
+}

@@ -134,6 +134,7 @@ static void annotate_symbols(ast_node_t *node, ast_sym_list_t *syms, int is_glob
 						//Change node to reflect.
 						n->type=AST_TYPE_SYSCALL;
 						n->valpos=callno;
+						n->value=s;
 					}
 				} else {
 					panic_error(n, "Cannot call non-function %s", n->name);
@@ -408,9 +409,10 @@ int check_var_type_matches_fn_arg_type(ast_node_t *vardef, ast_node_t *fndef, in
 	return 0;
 }
 
-void ast_ops_fix_function_args(ast_node_t *node) {
+//Note: this needs function calls already rewritten to syscalls
+static void ast_ops_fix_function_args(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
-		if (n->type==AST_TYPE_FUNCCALL) {
+		if (n->type==AST_TYPE_FUNCCALL || n->type==AST_TYPE_SYSCALL) {
 			//iterate over function args
 			ast_node_t *funcdef=n->value;
 			ast_node_t *funcdefarg=ast_find_type(funcdef->children, AST_TYPE_FUNCDEFARG);
@@ -433,10 +435,13 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 					}
 				} else if (funcarg->type==AST_TYPE_NUMBER) {
 					//okay
+				} else if (funcarg->type==AST_TYPE_FUNCPTR) {
+					if (n->type==AST_TYPE_FUNCCALL) {
+						panic_error(n, "Function arg %d is function pointer, which is unsupported for non-syscalls.", argct);
+					}
 				} else {
-					printf("Didn't expect funcarg content:\n");
-					ast_dump(funcarg);
-					assert(0);
+					//Assume what's in here is OK. Ideally, we'd do a triple check to see if the node in the funcarg
+					//returns a number, but we don't have the infrastructure for that anyway.
 				}
 				argct++;
 				
@@ -449,13 +454,6 @@ void ast_ops_fix_function_args(ast_node_t *node) {
 			}
 			if (funcarg) {
 				panic_error(node, "Too many arguments to function '%s' (got %d)", funcdef->name, argct);
-			}
-			//Check if one of the arguments is a function pointer.
-			if (n->children) {
-				ast_node_t *fa=ast_find_type(n->children, AST_TYPE_FUNCPTR);
-				if (fa) {
-					panic_error(fa, "Function pointer argument to non-syscall function is not allowed.");
-				}
 			}
 		}
 		if (n->children) ast_ops_fix_function_args(n->children);

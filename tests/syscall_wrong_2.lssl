@@ -1,0 +1,7 @@
+
+function main() {
+	var a[2];
+//ERROR HERE
+//   v
+   sin(a);
+}
