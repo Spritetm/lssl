@@ -1,0 +1,15 @@
+
+function correct_cb(a, b) {
+
+}
+
+function wrong_cb(a) {
+
+}
+
+function main() {
+	register_led_cb(correct_cb)
+//ERROR HERE
+//                  v
+    register_led_cb(wrong_cb)
+}

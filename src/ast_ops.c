@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
+#include <stdbool.h>
 #include "ast.h"
 #include "error.h"
 #include "vm_syscall.h"
@@ -409,6 +410,35 @@ int check_var_type_matches_fn_arg_type(ast_node_t *vardef, ast_node_t *fndef, in
 	return 0;
 }
 
+static bool compare_function_signature_arg(ast_node_t *afuncarg, ast_node_t *bfuncarg) {
+	ast_node_t *a, *b;
+	a=ast_find_type(afuncarg->children, AST_TYPE_STRUCTREF);
+	b=ast_find_type(bfuncarg->children, AST_TYPE_STRUCTREF);
+	if (a && b && a->value==b->value) return true;
+	if (a || b) return false; //either one is NULL or the structs they point to are different
+	a=ast_find_type(afuncarg->children, AST_TYPE_ARRAYREF);
+	b=ast_find_type(bfuncarg->children, AST_TYPE_ARRAYREF);
+	if (a && b) return compare_function_signature_arg(a, b);
+	if (a || b) return false; //one is NULL, the other is not
+	//both are PODs
+	return true;
+}
+
+//Checks two function definitions to see if the signature is the same. Used to check
+//callback function definitions against callback function pointers.
+static bool check_same_function_signature(ast_node_t *afuncargs, ast_node_t *bfuncargs) {
+	ast_node_t *afuncarg=ast_find_type(afuncargs, AST_TYPE_FUNCDEFARG);
+	ast_node_t *bfuncarg=ast_find_type(bfuncargs, AST_TYPE_FUNCDEFARG);
+	while (afuncarg!=NULL && bfuncarg!=NULL) {
+		if (!compare_function_signature_arg(afuncarg, bfuncarg)) return false;
+		afuncarg=ast_find_type(afuncarg->sibling, AST_TYPE_FUNCDEFARG);
+		bfuncarg=ast_find_type(bfuncarg->sibling, AST_TYPE_FUNCDEFARG);
+	}
+	if (afuncarg==NULL && bfuncarg!=NULL) return false;
+	if (afuncarg!=NULL && bfuncarg==NULL) return false;
+	return true;
+}
+
 //Note: this needs function calls already rewritten to syscalls
 static void ast_ops_fix_function_args(ast_node_t *node) {
 	for (ast_node_t *n=node; n!=NULL; n=n->sibling) {
@@ -436,8 +466,14 @@ static void ast_ops_fix_function_args(ast_node_t *node) {
 				} else if (funcarg->type==AST_TYPE_NUMBER) {
 					//okay
 				} else if (funcarg->type==AST_TYPE_FUNCPTR) {
-					if (n->type==AST_TYPE_FUNCCALL) {
+					if (n->type!=AST_TYPE_SYSCALL) {
 						panic_error(n, "Function arg %d is function pointer, which is unsupported for non-syscalls.", argct);
+					} else {
+						if (!ast_find_type(funcdefarg->children, AST_TYPE_FUNCPTRDEF)) {
+							panic_error(n, "Function arg %d: function does not accept function pointer", argct);
+						} else if (!check_same_function_signature(funcarg->value->children, funcdefarg->children->children)) {
+							panic_error(n, "Function arg %d has incompatible function signature.", argct);
+						}
 					}
 				} else {
 					//Assume what's in here is OK. Ideally, we'd do a triple check to see if the node in the funcarg

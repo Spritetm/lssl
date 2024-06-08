@@ -239,6 +239,14 @@ funcdefarg: TOKEN_STR vardef_nonpod {
 		$$=$1;
 		$$->type=AST_TYPE_FUNCDEFARG;
 	}
+| TOKEN_STR TOKEN_LPAREN funcdefargs TOKEN_RPAREN {
+		$$=ast_new_node(AST_TYPE_FUNCDEFARG, &@$);
+		ast_node_t *pd=ast_new_node(AST_TYPE_FUNCPTRDEF, &@$);
+		$$->name=$1;
+		pd->returns=AST_RETURNS_NUMBER; //functions can only return a number for now
+		ast_add_child($$, pd);
+		ast_add_child(pd, $3);
+}
 
 while_statement: TOKEN_WHILE TOKEN_LPAREN expr TOKEN_RPAREN input_line {
 		$$=ast_new_node(AST_TYPE_WHILE, &@$);

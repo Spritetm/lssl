@@ -46,8 +46,8 @@ static const char *led_hdr=
 "	var s;\n"
 "	var v;\n"
 "}\n"
-"syscalldef register_led_cb(cb);\n"
-"syscalldef register_frame_start_cb(cb);\n"
+"syscalldef register_led_cb(cb(pos, time));\n"
+"syscalldef register_frame_start_cb(cb());\n"
 "syscalldef led_set_rgb(r, g, b);\n";
 
 void led_syscalls_init() {

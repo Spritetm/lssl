@@ -1,6 +1,9 @@
 
+function bla(a,b) {
+
+}
 
 function main() {
-	register_led_cb(main);
+	register_led_cb(bla);
 	return 42;
 }
