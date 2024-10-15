@@ -22,6 +22,6 @@ jobs:
     # Steps represent a sequence of tasks that will be executed as part of the job
     steps:
       - uses: actions/checkout@v4
-      - name: Build wasm demo
+      - name: Build and run tests
         working-directory: ${{ github.workspace }}/
-        run: cd demo && make
+        run: cd src && make && ./test

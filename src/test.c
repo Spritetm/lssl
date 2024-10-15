@@ -224,4 +224,5 @@ int main(int argc, char **argv) {
 		}
 	}
 	printf(" *** Success: %d Fail %d *** \n", ok, fail);
+	return fail?1:0;
 }
