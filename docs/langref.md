@@ -2,12 +2,20 @@
 
 The LSSL language looks like a mix between C and Javascript. It's a domain specific
 language for controlling LEDs, with things not useful for that purpose stripped out.
-For instance, there's no support for strings.
+For instance: there's no support for strings and only one basic numerical
+data type.
+
+## Comments
+
+C-style single line comments starting with ``//`` are allowed: everything from the
+``//`` to the end of the line is ignored. Multiline comments are not supported.
 
 ## Variables
 
-Variables in LSSL have a static datatype. LSSL has three-ish basic data 
-types: the plain old scalar, the array, and the struct.
+Variables in LSSL have a static datatype. LSSL has three basic data 
+types: the plain old scalar, the array, and the struct. There is a fourth
+datatype (the function pointer) but its use is limited to passing to
+syscalls.
 
 ### Scalar type
 
@@ -28,7 +36,7 @@ will be clamped to the maximum or minimum variable the scalar supports, respecti
 ### Arrays
 
 LSSL supports arrays without a limit to dimensions. Arrays in LSSL are base-zero, so
-array[0] will reference the first element, array[1] the 2nd etc. Note that LSSL keeps
+array[0] will reference the first element, array[1] the second etc. Note that LSSL keeps
 track of the size of an array; referencing a member that is outside the range specified 
 when declaring the array will lead to a runtime error. Arrays are also declared with the
 'var' keyword, but at the moment cannot be initialized at declaration time.
@@ -52,7 +60,7 @@ like C structs, but the syntax is a bit different: they behave like they're type
 but there's no need for typedef in the declaration:
 
 ```c
-//This declares the type; there's no such variable as my_struct.
+//This declares the type. (Note that this does *not* create a my_struct variable.)
 struct my_struct {
 	var a;			//scalar member
 	var b[10];		//array member
@@ -63,7 +71,7 @@ struct second_struct {
 	my_struct d[10];	//array of structs as struct member
 }
 
-//this *does* define a variable
+//this *does* define a variable of type my_struct
 second_struct myvar;
 //use a dot to access struct members
 myvar.d[2].b[2]=3;
@@ -77,7 +85,8 @@ myarray[1].a=2;
 
 Function pointers are not fully supported: they cannot be kept in variables, arrays 
 or structs, and normal functions cannot use them as an argument or return value.
-They only are supported in syscalls, that is, functions provided by the VM.
+They only are supported in syscalls, that is, external functions written in C that
+are part of the virtual machine the code runs on.
 
 ```c
 
@@ -108,9 +117,6 @@ var a=1;
 }
 //a will be 1 here
 ```
-
-A comment starts with two slashes ``//`` and ends at the end of the line, C-style. Multiline
-comments aren't supported.
 
 ### Functions
 
@@ -145,5 +151,12 @@ var r=my_fn(a, b, c, d);
 //You can also ignore the return value.
 my_fn(a, b, c, d);
 ```
+
+Note that unlike in C, functions do not need to be declared before they are used.
+
+
+### Syscalls
+
+
 
 
