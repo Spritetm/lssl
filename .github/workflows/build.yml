@@ -24,4 +24,4 @@ jobs:
       - uses: actions/checkout@v4
       - name: Build and run tests
         working-directory: ${{ github.workspace }}/
-        run: cd src && make && ./test
+        run: cd src && make test && ./test
