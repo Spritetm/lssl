@@ -7,7 +7,7 @@ SRC_JS = js_funcs.c
 SRC_ALL = $(SRC_BASE) $(SRC_TEST) $(SRC_JS) $(SRC_LSSL)
 DEPFLAGS = -MT $@ -MMD -MP
 
-CFLAGS=-ggdb -Wall $(DEPFLAGS)
+CFLAGS=-g3 -O1 -Wall $(DEPFLAGS)
 
 default: test lssl lssl.js
 

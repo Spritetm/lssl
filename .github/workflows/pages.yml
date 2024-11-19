@@ -42,6 +42,7 @@ jobs:
          source ./emsdk/emsdk_env.sh
          cd demo
          make
+         cp ../src/*.c ../src/*.h .
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
