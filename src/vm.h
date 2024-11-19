@@ -18,6 +18,7 @@ typedef struct {
 static inline const char *vm_err_to_str(vm_error_en error) {
 	const char *erstr[]={"none", "stack overflow", "stack underflow", 
 			"unknown opcode", "array out of bounds", "internal error"};
+	if (error<0 || error>=(sizeof(erstr)/sizeof(erstr[0]))) return "unknown error?";
 	return erstr[error];
 }
 
