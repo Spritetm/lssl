@@ -16,10 +16,11 @@ void bail_if_vm_err(lssl_vm_t *vm, ast_node_t *prognode, vm_error_t *vm_err) {
 	if (vm_err->type==0) return;
 	const file_loc_t *loc=ast_lookup_loc_for_pc(prognode, vm_err->pc);
 	if (!loc) {
-		printf("Running main() resulted in an error at pc 0x%X, but file loc didn't resolve!\n", vm_err->pc);
+		printf("Running main() resulted in error %s (%d) at pc 0x%X, but file loc didn't resolve!\n", 
+				vm_err_to_str(vm_err->type), vm_err->type, vm_err->pc);
 		exit(1);
 	} else {
-		yyerror(loc, &prognode, NULL, "Runtime error %s", vm_err_to_str(vm_err->type));
+		yyerror(loc, &prognode, NULL, "Runtime error %s (%d)", vm_err_to_str(vm_err->type), vm_err->type);
 		exit(1);
 	}
 }
@@ -110,7 +111,7 @@ int main(int argc, char **argv) {
 	if (do_run) {
 		printf("Compile done. Running VM code.\n");
 		lssl_vm_t *vm=lssl_vm_init(bin, bin_len, 65536);
-		vm_error_t vm_err;
+		vm_error_t vm_err={};
 		int32_t ret=lssl_vm_run_main(vm, &vm_err);
 		if (vm_err.type) {
 			printf("Running main() returned error %d\n", vm_err.type);

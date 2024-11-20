@@ -54,7 +54,7 @@ program_t *recompile(char *code) {
 int check_and_report_vm_error(vm_error_t *err, const char *what) {
 	if (err->type==LSSL_VM_ERR_NONE) return 0;
 	const file_loc_t *loc=ast_lookup_loc_for_pc(last_ast, err->pc);
-	yyerror(loc, &last_ast, NULL, "Runtime error calling %s: '%s'", what, vm_err_to_str(err->type));
+	yyerror(loc, &last_ast, NULL, "Runtime error calling %s: '%s' (%d)", what, vm_err_to_str(err->type), err->type);
 	return 1;
 }
 
@@ -65,7 +65,7 @@ uint8_t *get_led(int pos, float t) {
 		rgb[0]=0; rgb[1]=0; rgb[2]=128;
 		return rgb;
 	}
-	vm_error_t err;
+	vm_error_t err={};
 	led_syscalls_calculate_led(vm, pos, t, &err);
 	if (check_and_report_vm_error(&err, "get_led")) return NULL;
 	led_syscalls_get_rgb(&rgb[0], &rgb[1], &rgb[2]);
@@ -74,7 +74,7 @@ uint8_t *get_led(int pos, float t) {
 
 void frame_start() {
 	if (!vm) return;
-	vm_error_t err;
+	vm_error_t err={};
 	led_syscalls_frame_start(vm, &err);
 	check_and_report_vm_error(&err, "frame_start");
 }
