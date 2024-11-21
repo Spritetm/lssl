@@ -20,7 +20,7 @@ didn't want to integrate these effects in the (universal) firmware.
 
 This project is inspired by OpenGL shaders, which are small programs that assign a color
 value to each pixel in a rendered triangle; the 'shader language' in the name stems
-from that. It's also inspired by <a href="https://electromage.com/pixelblaze">Pixelblaze</a>,
+from that. It's also inspired by [Pixelblaze](https://electromage.com/pixelblaze),
 a commercial product that uses a Javascript dialect to implement the same idea. (If
 you don't want to mess around with firmware, I suggest you buy their modules; they
 seem like a great off-the-shelf solution.) The downside of Pixelblaze is that the software
@@ -48,6 +48,13 @@ function main() {
 ```
 
 ![led sin example](doc/led_sin.gif "led sin example")
+
+## Demo
+
+If you want to play around with this, there are some demos [here](https://spritetm.github.io/lssl/).
+Obviously, there's no real led strip involved there, but you'll still be able to compile
+and run programs on the virtual strip on the bottom of the page.
+
 
 ## General architecture
 
