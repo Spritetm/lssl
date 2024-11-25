@@ -46,7 +46,13 @@ LSSL_SYSCALL_FUNCTION(syscall_tan) {
 
 LSSL_SYSCALL_FUNCTION(syscall_rand) {
 	//note this returns a real number
-	return (rand()%(arg[1]-arg[0]))+arg[0];
+	if (arg[0]==arg[1]) {
+		return arg[0];
+	} else if (arg[0]<arg[1]) {
+		return (rand()%(arg[1]-arg[0]))+arg[0];
+	} else if (arg[1]<arg[0]) {
+		return (rand()%(arg[0]-arg[1]))+arg[1];
+	}
 }
 
 LSSL_SYSCALL_FUNCTION(syscall_dumpstack) {
