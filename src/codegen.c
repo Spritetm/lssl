@@ -109,7 +109,6 @@ void handle_rhs_lhs_op(ast_node_t *node, lssl_insn_enum type) {
 }
 
 
-
 static void codegen_node(ast_node_t *n) {
 	if (!n) return;
 	if (n->type==AST_TYPE_NUMBER) {
@@ -266,6 +265,7 @@ static void codegen_node(ast_node_t *n) {
 		//syscall arg is a combination of the arg count (high 4 bit) and the
 		//syscall number (lower 12 bit)
 		ast_node_t *def=n->value;
+		//Count arg count for syscall
 		int no_args=0;
 		for (ast_node_t *i=def->children; i!=NULL; i=i->sibling) {
 			if (i->type==AST_TYPE_FUNCDEFARG) no_args++;

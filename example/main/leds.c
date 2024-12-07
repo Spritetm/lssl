@@ -14,11 +14,17 @@
 #define RMT_LED_STRIP_RESOLUTION_HZ 10000000 // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
 #define RMT_LED_STRIP_GPIO_NUM		8
 
-#define LED_COUNT	100
+#define LED_COUNT	(60*5)
 
 static const char *TAG = "leds";
 
+#define RGBW 1
+#ifdef RGBW
+static uint8_t led_strip_pixels[LED_COUNT * 4];
+#else
 static uint8_t led_strip_pixels[LED_COUNT * 3];
+#endif
+
 
 static const rmt_symbol_word_t ws2812_zero = {
 	.level0 = 1,
@@ -126,9 +132,16 @@ static void led_task(void *args) {
 					led_syscalls_calculate_led(vm, i, t, &err);
 					if (err.type!=LSSL_VM_ERR_NONE) break;
 					//Note the LED-strip is BGR so we swap R and G here.
+#ifdef RGBW
+					led_syscalls_get_rgbw(&led_strip_pixels[i*4+1],
+										&led_strip_pixels[i*4],
+										&led_strip_pixels[i*4+2],
+										&led_strip_pixels[i*4+3]);
+#else
 					led_syscalls_get_rgb(&led_strip_pixels[i*3+1],
 										&led_strip_pixels[i*3],
 										&led_strip_pixels[i*3+2]);
+#endif
 					if (err.type!=LSSL_VM_ERR_NONE) break;
 				}
 				const rmt_transmit_config_t tx_config = {
