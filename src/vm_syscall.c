@@ -50,7 +50,7 @@ LSSL_SYSCALL_FUNCTION(syscall_rand) {
 		return arg[0];
 	} else if (arg[0]<arg[1]) {
 		return (rand()%(arg[1]-arg[0]))+arg[0];
-	} else if (arg[1]<arg[0]) {
+	} else { //if (arg[1]<arg[0]) {
 		return (rand()%(arg[0]-arg[1]))+arg[1];
 	}
 }
@@ -73,14 +73,14 @@ static const char header[]=
 	"syscalldef dump_stack();\n";
 
 static const vm_syscall_list_entry_t builtin_syscalls[]={
-	{"abs", syscall_abs, 1}, 
-	{"floor", syscall_floor, 1}, 
-	{"ceil", syscall_ceil, 1}, 
-	{"clamp", syscall_clamp, 3},
-	{"sin", syscall_sin, 1}, 
-	{"cos", syscall_cos, 1}, 
-	{"tan", syscall_tan, 1}, 
-	{"rand", syscall_rand, 2},
+	{"abs", syscall_abs}, 
+	{"floor", syscall_floor}, 
+	{"ceil", syscall_ceil}, 
+	{"clamp", syscall_clamp},
+	{"sin", syscall_sin}, 
+	{"cos", syscall_cos}, 
+	{"tan", syscall_tan}, 
+	{"rand", syscall_rand},
 	{"dump_stack", syscall_dumpstack}
 };
 
@@ -157,12 +157,6 @@ const char *vm_syscall_name(int handle) {
 	const vm_syscall_list_entry_t *ent=ent_for_handle(handle);
 	assert(ent && "Invalid syscall entry!");
 	return ent->name;
-}
-
-int vm_syscall_arg_count(int handle) {
-	const vm_syscall_list_entry_t *ent=ent_for_handle(handle);
-	assert(ent && "Invalid syscall entry!");
-	return ent->argct;
 }
 
 int32_t vm_syscall(lssl_vm_t *vm, int syscall, int32_t *arg) {

@@ -248,11 +248,11 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 			vm->stack[pos_from_addr(addr)]+=arg;
 			push(vm, vm->stack[pos_from_addr(addr)]);
 		} else if (op==INSN_SYSCALL) {
-			int args=vm_syscall_arg_count(arg);
-			assert(args<=8);
-			int32_t argv[8];
+			int args=(arg>>12);	//argument count
+			int no=(arg&0xfff);	//syscall number
+			int32_t argv[16];
 			for (int i=0; i<args; i++) argv[args-i-1]=pop(vm);
-			push(vm, vm_syscall(vm, arg, argv));
+			push(vm, vm_syscall(vm, no, argv));
 		} else if (op==INSN_DUP) {
 			int32_t v=pop(vm);
 			push(vm, v);

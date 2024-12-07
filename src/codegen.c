@@ -263,8 +263,16 @@ static void codegen_node(ast_node_t *n) {
 		//ignore
 	} else if (n->type==AST_TYPE_SYSCALL) {
 		if (n->children) codegen(n->children);
+		//syscall arg is a combination of the arg count (high 4 bit) and the
+		//syscall number (lower 12 bit)
+		ast_node_t *def=n->value;
+		int no_args=0;
+		for (ast_node_t *i=def->children; i!=NULL; i=i->sibling) {
+			if (i->type==AST_TYPE_FUNCDEFARG) no_args++;
+		}
+		int syscallno=n->valpos;
 		ast_node_t *i=insert_insn_after_all_arg_eval(n, INSN_SYSCALL);
-		i->insn_arg=n->valpos; 
+		i->insn_arg=(no_args<<12)|syscallno;
 	} else if (n->type==AST_TYPE_FUNCPTR) {
 		ast_node_t *i=insert_insn_before_arg_eval(n, INSN_PUSH_R);
 		i->value=n->value;

@@ -81,7 +81,8 @@ Specifically, there are three stack pointers:
 	LSSL_INS_ENTRY(TG, ARG_NONE, "Pop two values, push 1 if 1st is greater, 0 otherwise") \
 	LSSL_INS_ENTRY(TLEQ, ARG_NONE, "Pop two values, push 1 if 1st is less or equal, 0 otherwise") \
 	LSSL_INS_ENTRY(TGEQ, ARG_NONE, "Pop two values, push 1 if 1st is greater or equal, 0 otherwise") \
-	LSSL_INS_ENTRY(SYSCALL, ARG_INT, "Perform the arg'th syscall") \
+	LSSL_INS_ENTRY(SYSCALL, ARG_INT, "Perform a syscall. Syscall no is in lower 12 bit, " \
+									"arg count is in upper 4 bit.") \
 	LSSL_INS_ENTRY(DUP, ARG_NONE, "Pop a value from the stack and push it twice") \
 	LSSL_INS_ENTRY(LEA, ARG_VAR, "Push the absolute address of the local var") \
 	LSSL_INS_ENTRY(LEA_G, ARG_VAR, "Push the absolute adddress of the global var") \
