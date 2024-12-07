@@ -44,7 +44,7 @@ static void parser_set_structref(ast_node_t *n, char *name) {
 
 
 %token TOKEN_EOL
-%token TOKEN_PLUS TOKEN_MINUS TOKEN_TIMES TOKEN_SLASH
+%token TOKEN_PLUS TOKEN_MINUS TOKEN_TIMES TOKEN_SLASH TOKEN_PERCENT
 %token TOKEN_LPAREN TOKEN_RPAREN
 %token TOKEN_SEMICOLON
 %token TOKEN_COMMA
@@ -436,6 +436,7 @@ compf: factor
 factor: not_term
 | factor TOKEN_TIMES not_term { $$=ast_new_node_2chld(AST_TYPE_TIMES, &@$, $1, $3); }
 | factor TOKEN_SLASH not_term { $$=ast_new_node_2chld(AST_TYPE_DIVIDE, &@$, $1, $3); }
+| factor TOKEN_PERCENT not_term { $$=ast_new_node_2chld(AST_TYPE_MODULUS, &@$, $1, $3); }
 
 not_term: br_term
 | TOKEN_BNOT br_term { $$=ast_new_node(AST_TYPE_BNOT, &@$); ast_add_child($$, $2); }

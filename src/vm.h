@@ -7,6 +7,7 @@ typedef enum {
 	LSSL_VM_ERR_STACK_UDF,
 	LSSL_VM_ERR_UNK_OP,
 	LSSL_VM_ERR_ARRAY_OOB,
+	LSSL_VM_ERR_DIVZERO,
 	LSSL_VM_ERR_INTERNAL
 } vm_error_en;
 
@@ -17,7 +18,8 @@ typedef struct {
 
 static inline const char *vm_err_to_str(vm_error_en error) {
 	const char *erstr[]={"none", "stack overflow", "stack underflow", 
-			"unknown opcode", "array out of bounds", "internal error"};
+			"unknown opcode", "array out of bounds", "divide by zero", 
+			"internal error"};
 	if (error<0 || error>=(sizeof(erstr)/sizeof(erstr[0]))) return "unknown error?";
 	return erstr[error];
 }

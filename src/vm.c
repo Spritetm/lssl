@@ -113,6 +113,12 @@ inline static int size_from_addr(uint32_t addr) {
 	return (addr&0xffff);
 }
 
+inline static int32_t saturate(int64_t v) {
+	if (v<INT32_MIN) return INT32_MIN;
+	if (v>INT32_MAX) return INT32_MAX;
+	return v;
+}
+
 //Runs until error, or until we return to address -1.
 int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 	int32_t ret=0;
@@ -141,21 +147,35 @@ int32_t lssl_vm_run(lssl_vm_t *vm, vm_error_t *error) {
 			int32_t a=pop(vm);
 			int32_t b=pop(vm);
 			int64_t v=(int64_t)a*(int64_t)b;
-			push(vm, v>>16);
+			push(vm, saturate(v>>16));
 		} else if (op==INSN_DIV) {
 			int32_t b=pop(vm);
 			int32_t a=pop(vm);
-			//todo: is this correct?
-			int64_t v=(((int64_t)a)<<16)/b;
-			push(vm, v);
+			if (b==0) {
+				printf("Divide by zero. PC=0x%X\n", vm->pc);
+				vm->error=LSSL_VM_ERR_DIVZERO;
+			} else {
+				int64_t v=(((int64_t)a)<<16)/b;
+				push(vm, saturate(v));
+			}
+		} else if (op==INSN_MOD) {
+			int32_t b=pop(vm);
+			int32_t a=pop(vm);
+			if (b==0) {
+				printf("Divide by zero. PC=0x%X\n", vm->pc);
+				vm->error=LSSL_VM_ERR_DIVZERO;
+			} else {
+				int64_t v=(((int64_t)a)<<16)%b;
+				push(vm, saturate(v));
+			}
 		} else if (op==INSN_ADD) {
 			int32_t b=pop(vm);
 			int32_t a=pop(vm);
-			push(vm, a+b);
+			push(vm, saturate(a+b));
 		} else if (op==INSN_SUB) {
 			int32_t b=pop(vm);
 			int32_t a=pop(vm);
-			push(vm, a-b);
+			push(vm, saturate(a-b));
 		} else if (op==INSN_LAND) {
 			int32_t b=pop(vm);
 			int32_t a=pop(vm);

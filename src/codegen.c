@@ -127,6 +127,8 @@ static void codegen_node(ast_node_t *n) {
 		handle_rhs_lhs_op_pod(n, INSN_MUL);
 	} else if (n->type==AST_TYPE_DIVIDE) {
 		handle_rhs_lhs_op_pod(n, INSN_DIV);
+	} else if (n->type==AST_TYPE_MODULUS) {
+		handle_rhs_lhs_op_pod(n, INSN_MOD);
 	} else if (n->type==AST_TYPE_LAND) {
 		handle_rhs_lhs_op_pod(n, INSN_LAND);
 	} else if (n->type==AST_TYPE_LOR) {

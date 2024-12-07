@@ -42,6 +42,7 @@ hexdigit	[0-9A-Fa-f]
 "--"					{ return TOKEN_MINUSMINUS;	}
 "*"						{ return TOKEN_TIMES;		}
 "/"						{ return TOKEN_SLASH;		}
+"%"						{ return TOKEN_PERCENT;		}
 "("						{ return TOKEN_LPAREN;		}
 ")"						{ return TOKEN_RPAREN;		}
 ";"						{ return TOKEN_SEMICOLON;	}

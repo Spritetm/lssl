@@ -58,6 +58,7 @@ Specifically, there are three stack pointers:
 	LSSL_INS_ENTRY(WR_VAR, ARG_NONE, "Pop address & value, write value to address") \
 	LSSL_INS_ENTRY(MUL, ARG_NONE, "Pop two values and push the multiplied result") \
 	LSSL_INS_ENTRY(DIV, ARG_NONE, "Pop two values and push the divided result") \
+	LSSL_INS_ENTRY(MOD, ARG_NONE, "Pop two values and push the modulus") \
 	LSSL_INS_ENTRY(ADD, ARG_NONE, "Pop two values and push the added result") \
 	LSSL_INS_ENTRY(SUB, ARG_NONE, "Pop two values and push the subtracted result") \
 	LSSL_INS_ENTRY(LAND, ARG_NONE, "Pop two values and push the logical and-ed result") \

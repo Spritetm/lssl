@@ -2,6 +2,6 @@
 function main(){
 	var a=4;
 	var b=40;
-	var c=2;
+	var c=42%10; //2
 	return a+(b/c)*c-c;
 }
