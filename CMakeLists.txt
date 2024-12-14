@@ -1,4 +1,4 @@
-set(SRC "src/led_syscalls.c" "src/vm.c" "src/vm_defs.c" "src/vm_syscall.c"
+set(SRC "src/led_syscalls.c" "src/led_map.c" "src/vm.c" "src/vm_defs.c" "src/vm_syscall.c"
 		"idf_bindings/lssl_idf_web.c" "${BUILD_DIR}/parser.c" "${BUILD_DIR}/lexer.c")
 
 idf_component_register(SRCS ${SRC}
@@ -26,7 +26,7 @@ add_custom_target(lexer DEPENDS ${BUILD_DIR}/lexer.c ${BUILD_DIR}/lexer_gen.h)
 add_dependencies(${COMPONENT_LIB} lexer)
 
 
-set(SRC_WASM "src/vm_defs.c" "src/ast.c" "src/ast_ops.c" "src/compile.c"
+set(SRC_WASM "src/vm_defs.c" "src/ast.c" "src/ast_ops.c" "src/compile.c" "src/led_map.c"
 	"src/codegen.c" "src/led_syscalls.c" "src/vm_syscall.c" "src/vm.c" "src/js_funcs.c")
 
 set(SRC_WASM_GEN "lexer.c" "parser.c")

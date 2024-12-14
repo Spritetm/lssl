@@ -6,7 +6,9 @@
 
 void panic_error(ast_node_t *node, const char *fmt, ...) {
 	ast_node_t *p=node;
+	node->has_error=true;
 	while (p->parent) p=p->parent;
+	p->has_error=true;
 //	ast_dump(p);
 	printf("Error on line %d col %d: ", node->loc.first_line+1, node->loc.first_column);
 	va_list ap;

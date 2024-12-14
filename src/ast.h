@@ -1,5 +1,6 @@
 #pragma once
 #include <stdint.h>
+#include <stdbool.h>
 #include <stddef.h>
 #include "file_loc.h"
 #include "vm_defs.h"
@@ -64,6 +65,7 @@ typedef enum {
 struct ast_node_t {
 	ast_type_en type;
 	ast_returns_t returns;
+	bool has_error;
 	char *name; //if not NULL, memory here is owned by the node
 	int32_t number;
 	int size;

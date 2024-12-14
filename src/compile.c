@@ -40,6 +40,10 @@ ast_node_t *lssl_compile(const char *code) {
 		return NULL;
 	}
 	ast_ops_do_compile(prognode);
+	if (prognode->has_error) {
+		free(prognode);
+		return NULL;
+	}
 	yylex_destroy(myscanner);
 	return prognode;
 }

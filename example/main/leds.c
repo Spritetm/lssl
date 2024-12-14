@@ -14,17 +14,21 @@
 #define RMT_LED_STRIP_RESOLUTION_HZ 10000000 // 10MHz resolution, 1 tick = 0.1us (led strip needs a high resolution)
 #define RMT_LED_STRIP_GPIO_NUM		8
 
-#define LED_COUNT	(60*5)
+#define LED_COUNT	(30*5)
 
 static const char *TAG = "leds";
 
-#define RGBW 1
+//#define RGBW 1
 #ifdef RGBW
 static uint8_t led_strip_pixels[LED_COUNT * 4];
 #else
 static uint8_t led_strip_pixels[LED_COUNT * 3];
 #endif
 
+
+int leds_get_count() {
+	return LED_COUNT;
+}
 
 static const rmt_symbol_word_t ws2812_zero = {
 	.level0 = 1,
@@ -85,12 +89,23 @@ static size_t encoder_callback(const void *data, size_t data_size,
 	}
 }
 
+//use ascii control chars for special things
+#define PGMNAME_SPECIAL_LED 1
+
 QueueHandle_t progq;
 
 void leds_change_program(const char *pgm) {
-	assert(pgm[17]==0);
+	assert(pgm[16]==0);
 	xQueueSend(progq, pgm, portMAX_DELAY);
 }
+
+void leds_set_mapper_led(int led) {
+	char pgm[17]={0};
+	sprintf(pgm, " %d", led);
+	pgm[0]=PGMNAME_SPECIAL_LED;
+	xQueueSend(progq, pgm, portMAX_DELAY);
+}
+
 
 static rmt_channel_handle_t led_chan = NULL;
 static rmt_encoder_handle_t simple_encoder = NULL;
@@ -107,21 +122,42 @@ static void led_task(void *args) {
 	while(1) {
 		if (xQueueReceive(progq, progname, pdMS_TO_TICKS(10))) {
 			assert(progname[16]==0);
-			free(pgm);
-			pgm=lssl_web_get_program(progname, &pgmlen);
-			if (pgm) {
-				if (vm) lssl_vm_free(vm);
-				led_syscalls_clear();
-				vm=lssl_vm_init(pgm, pgmlen, 8192);
-				if (vm) {
-					lssl_vm_run_main(vm, &err);
-				} else {
-					printf("Couldn't init vm!\n");
-					free(pgm);
-					pgm=NULL;
+			if (progname[0]==PGMNAME_SPECIAL_LED) {
+				free(pgm);
+				pgm=NULL;
+				int led=atoi(&progname[1]);
+				for (int i=0; i<LED_COUNT; i++) {
+					int v=(i==led)?255:0;
+#ifdef RGBW
+					led_strip_pixels[i*4+3]=v;
+#else
+					led_strip_pixels[i*3+1]=v;
+					led_strip_pixels[i*3]=v;
+					led_strip_pixels[i*3+2]=v;
+#endif
+					const rmt_transmit_config_t tx_config = {
+						.loop_count = 0, // no transfer loop
+					};
+					ESP_ERROR_CHECK(rmt_transmit(led_chan, simple_encoder, led_strip_pixels, sizeof(led_strip_pixels), &tx_config));
+					ESP_ERROR_CHECK(rmt_tx_wait_all_done(led_chan, portMAX_DELAY));
 				}
 			} else {
-				printf("leds: progname not found!\n");
+				free(pgm);
+				pgm=lssl_web_get_program(progname, &pgmlen);
+				if (pgm) {
+					if (vm) lssl_vm_free(vm);
+					led_syscalls_clear();
+					vm=lssl_vm_init(pgm, pgmlen, 8192);
+					if (vm) {
+						lssl_vm_run_main(vm, &err);
+					} else {
+						printf("Couldn't init vm!\n");
+						free(pgm);
+						pgm=NULL;
+					}
+				} else {
+					printf("leds: progname not found!\n");
+				}
 			}
 		}
 		if (pgm && err.type==LSSL_VM_ERR_NONE) {

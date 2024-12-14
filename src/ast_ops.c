@@ -664,7 +664,7 @@ void ast_ops_add_program_start(ast_node_t *node, const char *main_fn_name) {
 			return;
 		}
 	}
-	printf("Warning: no function '%s' found. Using first function defined instead.\n", main_fn_name);
+	panic_error(node, "Could not find function 'main'.");
 }
 
 

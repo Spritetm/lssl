@@ -383,6 +383,30 @@ int32_t lssl_vm_run_main(lssl_vm_t *vm, vm_error_t *error) {
 	return lssl_vm_run_function(vm, 0, 0, NULL, error);
 }
 
+int32_t *lssl_vm_alloc_data(lssl_vm_t *vm, int item_ct) {
+	if (vm->sp+item_ct >= vm->stack_size) {
+		printf("Stack overflow at lssl_vm_alloc_data (pushed %d items, stack size %d)\n", item_ct, vm->stack_size);
+		vm->error=LSSL_VM_ERR_STACK_OVF;
+		return NULL;
+	}
+	int32_t *ret=&vm->stack[vm->sp];
+	vm->sp+=item_ct;
+	return ret;
+}
+
+int32_t lssl_vm_data_addr(lssl_vm_t *vm, int32_t *ptr) {
+	int pos=ptr-vm->stack;
+	assert(pos>=0);
+	return pos;
+}
+
+
+void lssl_vm_free_data(lssl_vm_t *vm, int32_t *data) {
+	int pos=data-vm->stack;
+	assert(pos>=0);
+	if (vm->sp > pos) vm->sp=pos;
+}
+
 void lssl_vm_free(lssl_vm_t *vm) {
 	if (vm) free(vm->stack);
 	free(vm);

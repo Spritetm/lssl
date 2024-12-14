@@ -162,8 +162,10 @@ EM_JS(void, call_report_error, (int pos_start, int pos_end, char* msg), {
 });
 
 void panic_error(ast_node_t *node, const char *fmt, ...) {
-//	ast_node_t *p=node;
-//	while (p->parent) p=p->parent;
+	ast_node_t *p=node;
+	node->has_error=true;
+	while (p->parent) p=p->parent;
+	p->has_error=true;
 //	ast_dump(p);
 	char *msg;
 	va_list ap;
