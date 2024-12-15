@@ -7,32 +7,6 @@
 #define LSSL_VM_VER 1
 
 
-/*
-How Does The VM Work?
-The VM has two memory spaces: the program and the stack. The program is loaded
-from the compiled code and cannot be changed (=ROM). The stack is an array of
-32-bit R/W memory that works as, well, a stack. It grows upward, that is, the
-first byte saved is at position 0, the 2nd at position 1 etc.
-
-Generally, this thing behaves as you'd expect from a stack-based VM: instructions
-pop their operands from the stack, do stuff with it, and push the result back 
-to the stack.
-
-Specifically, there are three stack pointers:
-- SP, the Stack Pointer. Always points to the top of the stack; any RAM above it
-  can be seen as having undefined data.
-- BP, the Base Pointer. This is the SP when a function call starts. It provides
-  a handy way to get to local POD variables and the pointers to local objects: 
-  these are stored directly above the base pointer. It can also be used to access
-  function arguments: these are at a fixed position under the BP.
-- AP, the Allocation Pointer. At the entry of each function block, this gets
-  set to SP. Any local allocation of objects then happens by increasing SP
-  by the needed amount and saving the address in the local variable pointer
-  as referenced by BP. At the end of the function block, SP is restored to AP,
-  immediately clearing all space allocated to the local objects.
-*/
-
-
 //We use some Deeper C Preprocessor Magic so we can keep the instruction defs and arg
 //types in one place, and generate enums/structs/... from that. This keeps them from 
 //going out of sync.

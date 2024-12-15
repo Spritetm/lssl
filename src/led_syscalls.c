@@ -45,12 +45,20 @@ LSSL_SYSCALL_FUNCTION(syscall_led_set_rgbw) {
 	return 0;
 }
 
+LSSL_SYSCALL_FUNCTION(syscall_led_get_closest) {
+	
+	
+	return 0;
+}
+
+
 static const vm_syscall_list_entry_t led_syscalls[]={
 	{"register_led_cb", syscall_register_led_cb},
 	{"register_led_mapped_cb", syscall_register_led_mapped_cb},
 	{"register_frame_start_cb", syscall_register_frame_start_cb},
 	{"led_set_rgb", syscall_led_set_rgb},
 	{"led_set_rgbw", syscall_led_set_rgbw}
+	{"led_get_closest", syscall_led_get_closest);
 };
 
 static const char *led_hdr=
@@ -70,11 +78,16 @@ static const char *led_hdr=
 "	var y;\n"
 "	var z;\n"
 "}\n"
+"struct closest_leds_t {\n"
+"	var index;\n"
+"	mapped_pos_t pos;\n"
+"}\n"
 "syscalldef register_led_cb(cb(pos, time));\n"
 "syscalldef register_led_mapped_cb(cb(mapped_pos_t pos, time));\n"
 "syscalldef register_frame_start_cb(cb());\n"
 "syscalldef led_set_rgb(r, g, b);\n"
-"syscalldef led_set_rgbw(r, g, b, w);\n";
+"syscalldef led_set_rgbw(r, g, b, w);\n"
+"syscalldef led_get_closest(to_which, closest_leds_t closest[]);\n";
 
 void led_syscalls_init() {
 	vm_syscall_add_local_syscalls("led", led_syscalls, sizeof(led_syscalls)/sizeof(vm_syscall_list_entry_t), led_hdr);
