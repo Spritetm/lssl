@@ -9,8 +9,19 @@
 #include "freertos/semphr.h"
 #include "nvs.h"
 #include "lssl_idf_web.h"
+#include "led_map.h"
 
+
+/*
+NVS rules:
+- Lssl program sources are formatted with 'p' + name
+- Compiled lssl programs are formatted with 'b' + name
+- Singlet keys (e.g. mapfile, last ran program) are formatted 'i' + name
+*/
 #define NVS_NAMESPACE "lssl_progs"
+
+#define NVS_LEDMAPKEY "iledmap"
+#define NVS_LASTPGMKEY "ilastpgm"
 
 #define TAG "lssl_web"
 
@@ -24,12 +35,41 @@ EXTERN_FILE(lssl_wasm_map);
 EXTERN_FILE(lssl_edit_css);
 EXTERN_FILE(lssl_edit_html);
 EXTERN_FILE(lssl_edit_js);
+EXTERN_FILE(lssl_map_html);
 
 typedef esp_err_t (*web_cb_t)(httpd_req_t *req);
 
 static esp_err_t (*lssl_custom_get_httpd_uri_handler)(httpd_req_t *r) = NULL;
 static esp_err_t (*lssl_custom_post_httpd_uri_handler)(httpd_req_t *r) = NULL;
 static program_changed_cb_t program_changed_cb=NULL;
+
+static int led_count;
+
+void lssl_web_init(int ledcount) {
+	led_count=ledcount;
+
+	//Go load map and initial program from nvs
+	nvs_handle nvs={};
+	esp_err_t err=nvs_open(NVS_NAMESPACE, NVS_READONLY, &nvs);
+	if (err!=ESP_ERR_NVS_NOT_FOUND) {
+		ESP_ERROR_CHECK(err); //note falls through on no error
+	} else {
+		return; //nothing saved yet
+	}
+
+	size_t req_sz=0;
+	if (nvs_get_blob(nvs, NVS_LEDMAPKEY, NULL, &req_sz)==ESP_OK) {
+		void *map=calloc(req_sz, 1);
+		nvs_get_blob(nvs, NVS_LEDMAPKEY, map, &req_sz);
+		led_map_set_blob(map, req_sz);
+	}
+	char name[17]={0};
+	req_sz=16;
+	if (nvs_get_str(nvs, NVS_LASTPGMKEY, name, &req_sz)==ESP_OK) {
+		if (program_changed_cb) program_changed_cb(name);
+	}
+	nvs_close(nvs);
+}
 
 void lssl_web_register_program_changed_cb(program_changed_cb_t cb) {
 	program_changed_cb=cb;
@@ -126,7 +166,6 @@ static esp_err_t post_save_to_nvs(httpd_req_t *req, const char *name) {
 	nvs_close(nvs);
 	ESP_LOGI(TAG, "Saved file %s, size %d bytes", name, len);
 
-	nvs_close(nvs);
 	httpd_resp_set_status(req, "200 OK");
 	httpd_resp_set_type(req, "text/plain");
 	httpd_resp_send(req, "", 0);
@@ -144,8 +183,97 @@ static esp_err_t save_bytecode(httpd_req_t *req) {
 	snprintf(name, 16, "b%s", file_in_uri(req->uri));
 	esp_err_t r=post_save_to_nvs(req, name);
 	if (program_changed_cb) program_changed_cb(file_in_uri(req->uri));
+
+	nvs_handle nvs;
+	ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs));
+	nvs_set_str(nvs, NVS_LASTPGMKEY, file_in_uri(req->uri));
+	nvs_close(nvs);
 	return r;
 }
+
+typedef struct {
+	char buf[128];
+	int n;
+} parse_float_t;
+
+static int parse_float(parse_float_t *s, char c, float *ret) {
+	if (c=='\n' || c==',') {
+		s->buf[s->n]=0;
+		s->n=0;
+		*ret=atof(s->buf);
+		return 1;
+	} else {
+		s->buf[s->n]=c;
+		if (s->n<127) s->n++;
+	}
+	return 0;
+}
+
+static esp_err_t mapdata_post(httpd_req_t *req) {
+	char *q=strchr(req->uri, '?');
+	if (!q) goto err;
+	q++; //skip ?
+	esp_err_t r;
+	char buf[128];
+	r=httpd_query_key_value(q, "count", buf, 128);
+	if (r!=ESP_ERR_NOT_FOUND) {
+		int count=atoi(buf);
+		httpd_query_key_value(q, "dim", buf, 128);
+		int dim=atoi(buf);
+		printf("New map: %d leds, %d dimensions\n", count, dim);
+		int ret;
+		//we're parsing the led number as a float but that's OK:
+		//integers can be represented without loss from 0 to 16777216
+		float point[4];
+		led_map_create(count, dim);
+		int p=0;
+		parse_float_t pf={};
+		while ((ret = httpd_req_recv(req, buf, sizeof(buf)))>0) {
+			float f;
+			for (int i=0; i<ret; i++) {
+				if (parse_float(&pf, buf[i], &f)) {
+					point[p++]=f;
+					if (p>=dim+1) {
+						p=0;
+						printf("Led %d: %f %f %f\n", (int)point[0], point[1], point[2], point[3]);
+						led_map_set_led_pos((int)point[0], point[1], point[2], point[3]);
+					}
+				}
+			}
+		}
+		int blob_len_bytes=0;
+		void *blob=led_map_get_blob(&blob_len_bytes);
+		nvs_handle nvs;
+		ESP_ERROR_CHECK(nvs_open(NVS_NAMESPACE, NVS_READWRITE, &nvs));
+		nvs_set_blob(nvs, NVS_LEDMAPKEY, blob, blob_len_bytes);
+		nvs_close(nvs);
+		ESP_LOGI(TAG, "Saved map, size %d bytes", blob_len_bytes);
+	}
+	httpd_resp_send(req, "OK", 2);
+	return ESP_OK;
+err:
+	httpd_resp_send(req, "?", 1);
+	return ESP_OK;
+}
+
+static esp_err_t mapdata_get(httpd_req_t *req) {
+	char buf[128];
+	sprintf(buf, "{\n\"count\": %d,\n \"pos\": [\n", led_map_get_size());
+	httpd_resp_send_chunk(req, buf, strlen(buf));
+	float x=0, y=0, z=0;
+	int size=led_map_get_size();
+	for (int i=0; i<size; i++) {
+		led_map_get_led_pos(i, &x, &y, &z);
+		sprintf(buf, "[%f, %f, %f]%s\n", x, y, z, i!=size-1?",":"");
+		httpd_resp_send_chunk(req, buf, strlen(buf));
+	}
+	sprintf(buf, "]\n}\n");
+	httpd_resp_send_chunk(req, buf, strlen(buf));
+
+	httpd_resp_send_chunk(req, buf, 0); //finish
+	return ESP_OK;
+}
+
 
 typedef struct {
 	const char *uri;
@@ -165,14 +293,17 @@ const web_file_t get_files[]={
 	WEB_FILE("/lssl_edit.css", "text/css", lssl_edit_css),
 	WEB_FILE("/lssl_edit.html", "text/html", lssl_edit_html),
 	WEB_FILE("/lssl_edit.js", "application/javascript", lssl_edit_js),
+	WEB_FILE("/lssl_map.html", "text/html", lssl_map_html),
 	WEB_CB("/lssl_list", list_programs),
 	WEB_CB("/lssl_program/*", get_program),
+	WEB_CB("/lssl_mapdata/*", mapdata_get),
 	{NULL, NULL, NULL, NULL, NULL}
 };
 
 const web_file_t post_files[]={
 	WEB_CB("/lssl_save_program/*", save_program),
 	WEB_CB("/lssl_save_compiled/*", save_bytecode),
+	WEB_CB("/lssl_mapdata/*", mapdata_post),
 	{NULL, NULL, NULL, NULL, NULL}
 };
 

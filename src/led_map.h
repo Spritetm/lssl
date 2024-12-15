@@ -10,5 +10,5 @@ int led_map_get_size();
 int led_map_get_dimensions();
 void *led_map_get_blob(int *len_bytes);
 //Note: calling this passes ownership from the region pointed to by data
-//over to the led_map logic.
+//over to the led_map logic (which will free() it when the time comes)
 void led_map_set_blob(void *data, int len_bytes);

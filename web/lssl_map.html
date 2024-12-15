@@ -2,6 +2,7 @@
 <html lang="en">
 <head>
 <title>Ledstrip controller</title>
+<link rel="stylesheet" type="text/css" href="lssl_edit.css">
 <script type="text/javascript">
 
 //Begin inline copy-paste of csv2array, to keep the license info
@@ -144,7 +145,7 @@ function parse_map(csv) {
 				leds[ct++]=led;
 			}
 		} else {
-			if (csv[i].length>dims+1) {
+			if (csv[i].length>=dims+1) {
 				var id=parseInt(csv[i][idpos]);
 				leds[id]=led;
 				if (id>=ct) ct=id+1;
@@ -157,7 +158,7 @@ function parse_map(csv) {
 var led_count=0;
 
 window.addEventListener("load", (event) => {
-	fetch("mapdata")
+	fetch("lssl_mapdata/")
 		.then(response => {
 			if (response.status != 200) throw new Error('Request failed');
 			return response.json();
@@ -188,7 +189,7 @@ window.addEventListener("load", (event) => {
 				if (send.dimensions>1) text+=ele.y+",";
 				if (send.dimensions>2) text+=ele.z+"\n";
 			});
-			const request = new Request("mapdata?count="+send.count+"&dim="+send.dimensions, {
+			const request = new Request("lssl_mapdata/?count="+send.count+"&dim="+send.dimensions, {
 				method: "POST",
 				body: text,
 			});

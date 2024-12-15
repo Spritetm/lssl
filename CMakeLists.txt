@@ -3,7 +3,7 @@ set(SRC "src/led_syscalls.c" "src/led_map.c" "src/vm.c" "src/vm_defs.c" "src/vm_
 
 idf_component_register(SRCS ${SRC}
         INCLUDE_DIRS src/ idf_bindings/ ${BUILD_DIR}/
-        EMBED_FILES web/lssl_edit.html web/lssl_edit.css web/lssl_edit.js
+        EMBED_FILES web/lssl_edit.html web/lssl_edit.css web/lssl_edit.js web/lssl_map.html
 			${BUILD_DIR}/lssl.js ${BUILD_DIR}/lssl.wasm ${BUILD_DIR}/lssl.wasm.map
 		REQUIRES json esp_http_server nvs_flash)
 

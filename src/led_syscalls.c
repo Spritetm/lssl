@@ -94,18 +94,24 @@ void led_syscalls_frame_start(lssl_vm_t *vm, vm_error_t *error) {
 	lssl_vm_run_function(vm, frame_start_cb_handle, 0, NULL, error);
 }
 
-void led_syscalls_calculate_led(lssl_vm_t *vm, int32_t led, float time, vm_error_t *error) {
+void led_syscalls_calculate_led(lssl_vm_t *vm, int32_t led, double time, vm_error_t *error) {
+	//int32_t overflow is undefined, so use an uint first
+	uint32_t time_uint=(time*65536UL);
+	time_uint=(time_uint&0x7FFFFFFF);
 	if (led_cb_handle>=0) {
-		int32_t arg[2]={led<<16, (time*65536)};
+		int32_t arg[2]={led<<16, time_uint};
 		lssl_vm_run_function(vm, led_cb_handle, 2, arg, error);
+		if (error->type) printf("VM error in led_syscalls_calculate_led for unmapped led function for led %d.\n", (int)led);
 	} else if (led_mapped_cb_handle>=0) {
 		int32_t *pos=lssl_vm_alloc_data(vm, 3);
 		pos[0]=led*65536;
 		pos[1]=0;
 		pos[2]=0;
 		led_map_get_led_pos_fixed(led, pos);
-		int32_t arg[2]={lssl_vm_data_addr(vm, pos), (time*65536)};
+		int32_t arg[2]={lssl_vm_data_addr(vm, pos), time_uint};
 		lssl_vm_run_function(vm, led_mapped_cb_handle, 2, arg, error);
+		lssl_vm_free_data(vm, pos);
+		if (error->type) printf("VM error in led_syscalls_calculate_led for mapped led function for led %d.\n", (int)led);
 	}
 }
 

@@ -1,4 +1,4 @@
 
 idf_component_register(SRCS "main.c" "leds.c"
-        EMBED_FILES root.html root.css favicon.ico map.html
+        EMBED_FILES root.html root.css favicon.ico
 )

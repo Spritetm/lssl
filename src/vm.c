@@ -85,7 +85,7 @@ allocated array/struct D in restricted scope
 
 static void push(lssl_vm_t *vm, int32_t val) {
 	if (vm->sp>=vm->stack_size) {
-		printf("Stack overflow at PC=0x%X (stack size %d)\n", vm->pc, vm->stack_size);
+		printf("Stack overflow at PC=0x%X (sp 0x%X stack size 0x%X)\n", vm->pc, vm->sp, vm->stack_size);
 		vm->error=LSSL_VM_ERR_STACK_OVF;
 		return;
 	}

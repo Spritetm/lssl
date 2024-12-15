@@ -163,7 +163,7 @@ static void led_task(void *args) {
 		if (pgm && err.type==LSSL_VM_ERR_NONE) {
 			led_syscalls_frame_start(vm, &err);
 			if (err.type==LSSL_VM_ERR_NONE) {
-				float t=esp_timer_get_time()/1000000.0;
+				double t=esp_timer_get_time()/1000000.0;
 				for (int i=0; i<LED_COUNT; i++) {
 					led_syscalls_calculate_led(vm, i, t, &err);
 					if (err.type!=LSSL_VM_ERR_NONE) break;

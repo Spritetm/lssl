@@ -31,18 +31,25 @@ LSSL_SYSCALL_FUNCTION(syscall_clamp) {
 
 LSSL_SYSCALL_FUNCTION(syscall_sin) {
 	float f=arg[0]/65536.0;
-	return sin(f)*65536;
+	return sinf(f)*65536;
 }
 
 LSSL_SYSCALL_FUNCTION(syscall_cos) {
 	float f=arg[0]/65536.0;
-	return cos(f)*65536;
+	return cosf(f)*65536;
 }
 
 LSSL_SYSCALL_FUNCTION(syscall_tan) {
 	float f=arg[0]/65536.0;
-	return tan(f)*65536;
+	return tanf(f)*65536;
 }
+
+LSSL_SYSCALL_FUNCTION(syscall_atan2) {
+	float y=arg[0]/65536.0;
+	float x=arg[1]/65536.0;
+	return atan2f(y, x)*65536;
+}
+
 
 LSSL_SYSCALL_FUNCTION(syscall_rand) {
 	//note this returns a real number
@@ -69,6 +76,7 @@ static const char header[]=
 	"syscalldef sin(x);\n"
 	"syscalldef cos(x);\n"
 	"syscalldef tan(x);\n"
+	"syscalldef atan2(y, x);\n"
 	"syscalldef rand(x, y);\n"
 	"syscalldef dump_stack();\n";
 
@@ -80,6 +88,7 @@ static const vm_syscall_list_entry_t builtin_syscalls[]={
 	{"sin", syscall_sin}, 
 	{"cos", syscall_cos}, 
 	{"tan", syscall_tan}, 
+	{"atan2", syscall_atan2}, 
 	{"rand", syscall_rand},
 	{"dump_stack", syscall_dumpstack}
 };
@@ -108,7 +117,7 @@ static syscall_list_t *syscall_list_last=&syscall_list_builtin;
 
 void vm_syscall_add_local_syscalls(const char *name, const vm_syscall_list_entry_t *syscalls, 
 									int count, const char *header) {
-	syscall_list_t *l=calloc(sizeof(syscall_list_t), 1);
+	syscall_list_t *l=calloc(1, sizeof(syscall_list_t));
 	l->name=strdup(name);
 	l->start=syscall_list_last->start+syscall_list_last->count;
 	l->count=count;

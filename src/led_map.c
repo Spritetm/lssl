@@ -46,10 +46,12 @@ int led_map_get_led_pos_fixed(int led, int32_t *pos) {
 
 
 int led_map_get_size() {
+	if (!map) return 0;
 	return map->size;
 }
 
 int led_map_get_dimensions() {
+	if (!map) return 1;
 	return map->dimensions;
 }
 
