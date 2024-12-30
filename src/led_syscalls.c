@@ -46,8 +46,7 @@ LSSL_SYSCALL_FUNCTION(syscall_led_set_rgbw) {
 }
 
 LSSL_SYSCALL_FUNCTION(syscall_led_get_closest) {
-	
-	
+	//ToDo: return array of leds closest to the indicated one
 	return 0;
 }
 
@@ -57,8 +56,8 @@ static const vm_syscall_list_entry_t led_syscalls[]={
 	{"register_led_mapped_cb", syscall_register_led_mapped_cb},
 	{"register_frame_start_cb", syscall_register_frame_start_cb},
 	{"led_set_rgb", syscall_led_set_rgb},
-	{"led_set_rgbw", syscall_led_set_rgbw}
-	{"led_get_closest", syscall_led_get_closest);
+	{"led_set_rgbw", syscall_led_set_rgbw},
+	{"led_get_closest", syscall_led_get_closest}
 };
 
 static const char *led_hdr=
